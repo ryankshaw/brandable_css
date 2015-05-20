@@ -1,0 +1,36 @@
+{
+  "name": "canvas_css",
+  "version": "0.0.1",
+  "description": "This is what we use to compile sass in canvas with all our variants and brand_css",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ryankshaw/canvas_css.git"
+  },
+  "author": "Ryan Shaw <ryankshaw@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/ryankshaw/canvas_css",
+  "bin": {
+    "canvas_css": "./bin/canvas_css"
+  },
+  "dependencies": {
+    "autoprefixer": "^5.1.1",
+    "babel": "^5.4.3",
+    "bluebird": "^2.9.25",
+    "chalk": "^1.0.0",
+    "chokidar": "^1.0.1",
+    "commander": "^2.8.1",
+    "debug": "^2.2.0",
+    "fs-extra": "^0.18.3",
+    "glob": "^5.0.6",
+    "js-yaml": "^3.3.1",
+    "lodash": "^3.8.0",
+    "mkdirp": "^0.5.1",
+    "node-sass": "^3.1.0",
+    "postcss": "^4.1.10",
+    "postcss-url": "^3.2.0"
+  }
+}
