@@ -219,8 +219,6 @@ export function watch() {
     .on('add', function(filename){ debug('file added to watcher', filename)})
     .add(PATHS.all_sass_bundles)
 
-
-
   for (var variant in cache.bundles_with_deps.data) {
     for (var bundleName in cache.bundles_with_deps.data[variant]) {
       for (let filename of cache.bundles_with_deps.data[variant][bundleName].includedFiles) {
