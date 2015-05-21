@@ -15,8 +15,10 @@ import supportedBrowsers from './browser-support'
 import cache from './cache'
 import {relativeSassPath} from './utils'
 
+// Any logging from compileSingleBundle needs to go to stderr so we can use stdout to
+// send css to rails controller when we compile a single bundle
 function warn() {
-  console.error(chalk.yellow(...arguments))
+  console.error(chalk.yellow('canvas_css warning', ...arguments))
 }
 
 export default async function compileSingleBundle ({bundleName, variant, brandVariablesFolder}) {
@@ -30,7 +32,7 @@ export default async function compileSingleBundle ({bundleName, variant, brandVa
     ) {
       includePaths.unshift(brandVariablesFolder)
     } else {
-      throw new Error("invalid brandVariablesFolder or you tried to include it in a legacy or high contrast bundle")
+      throw new Error('invalid brandVariablesFolder or you tried to include it in a legacy or high contrast bundle')
     }
   }
 
@@ -47,7 +49,7 @@ export default async function compileSingleBundle ({bundleName, variant, brandVa
     if (!md5) {
       md5 = ofFileSync(pathToFile)
       if (!md5) {
-        warn(sassFile, variant, " contains a url() to: ", originalUrl, 'which doesn\'t exist on disk')
+        warn(sassFile, variant, 'contains a url() to:', originalUrl, 'which doesn\'t exist on disk')
         return originalUrl
       }
       cache.file_checksums.update(relativePath, md5)
@@ -55,13 +57,11 @@ export default async function compileSingleBundle ({bundleName, variant, brandVa
     urlsFoundInCss.add(pathToFile)
 
     const {dir, name, ext} = path.posix.parse(parsedUrl.pathname)
-    parsedUrl.pathname = `/assets#{dir}/#{name}_#{md5}#{parsedPath.ext}`
+    parsedUrl.pathname = `/assets${dir}/${name}-${md5}${ext}`
     return url.format(parsedUrl)
   }
 
-  const successMessage = chalk.green('compiled', variant, bundleName, 'in')
-  console.time(successMessage)
-
+  const startTime = new Date()
   const nodeSassResult = await sassRender({
     file: sassFile,
     includePaths: includePaths,
@@ -77,7 +77,8 @@ export default async function compileSingleBundle ({bundleName, variant, brandVa
   ]).process(nodeSassResult.css, {from: sassFile})
 
   postcssResult.warnings().forEach(warn)
-  console.timeEnd(successMessage)
+  console.warn(chalk.green('compiled', variant, bundleName, 'in'), new Date() - startTime, 'ms')
+
   return {
     css: postcssResult.css,
     includedFiles: nodeSassResult.stats.includedFiles.concat([...urlsFoundInCss])

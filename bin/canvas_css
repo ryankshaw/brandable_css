@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
 process.env.UV_THREADPOOL_SIZE = 6
-require('babel/register')({
-  optional: ["es7.asyncFunctions"]
-})
+require('babel/register')({stage: 0})
 
 const program = require('commander')
 const main = require('../src/main')
@@ -24,7 +22,7 @@ program.parse(process.argv)
 // compile that one bundle and send it to stdout
 if (program.bundle) {
   compileSingleBundle({
-    sassFile: program.bundle,
+    bundleName: program.bundle,
     variant: program.variant,
     brandVariablesFolder: program.brandVariablesFolder
   })
