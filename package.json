@@ -4,6 +4,9 @@
   "description": "This is what we use to compile sass in canvas with all our variants and brand_css",
   "main": "index.js",
   "scripts": {
+    "build": "./node_modules/.bin/babel src --stage 0 --out-dir lib",
+    "dev": "npm run build -- --watch",
+    "prepublish": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -18,7 +21,6 @@
   },
   "dependencies": {
     "autoprefixer": "^5.1.1",
-    "babel": "^5.4.3",
     "bluebird": "^2.9.25",
     "chalk": "^1.0.0",
     "chokidar": "^1.0.1",
@@ -32,5 +34,8 @@
     "node-sass": "^3.1.0",
     "postcss": "^4.1.10",
     "postcss-url": "^3.2.0"
+  },
+  "devDependencies": {
+    "babel": "^5.4.7"
   }
 }
