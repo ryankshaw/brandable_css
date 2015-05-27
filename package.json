@@ -1,6 +1,6 @@
 {
   "name": "canvas_css",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "This is what we use to compile sass in canvas with all our variants and brand_css",
   "main": "index.js",
   "scripts": {
