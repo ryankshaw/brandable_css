@@ -106,7 +106,6 @@ function processChangedBundles(changedBundles) {
           brandId
         })
       }
-      debug('combinde5', arguments)
       return compileBundle({variant, bundleName, brandId, unbrandedCombinedChecksum})
     }
     await* Object.keys(variants).map(async function (variant) {
