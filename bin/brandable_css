@@ -5,4 +5,4 @@
 process.env.UV_THREADPOOL_SIZE = 6
 
 require("babel/polyfill")
-require('../lib/cli')
+require('lib/cli')
