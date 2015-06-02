@@ -1,8 +1,6 @@
-export default [
-  'legacy_normal_contrast',
-  'legacy_high_contrast',
-  'new_styles_normal_contrast',
-  'new_styles_high_contrast',
-  'k12_normal_contrast',
-  'k12_high_contrast'
-]
+import config from './config'
+
+const variants = Object.freeze(Object.keys(config.variants))
+
+export default variants
+export const BRANDABLE_VARIANTS = new Set(variants.filter((v) => config.variants[v].brandable))

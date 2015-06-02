@@ -1,7 +1,10 @@
 import crypto from 'crypto'
 import Promise from 'bluebird'
 import fs from 'fs'
+import path from 'path'
 import versions from './versions'
+import {paths as PATHS} from './config'
+
 
 function newHash() {
   let hash = crypto.createHash('md5')
@@ -9,11 +12,11 @@ function newHash() {
   return hash
 }
 
-export default function checksum (data) {
+export function checksum (data) {
   return newHash().update(data).digest('hex')
 }
 
-export async function ofFile(filename) {
+export function fileChecksum (filename) {
   return new Promise(function(resolve, reject){
     var hsh = newHash()
     var s = fs.ReadStream(filename)
@@ -23,7 +26,11 @@ export async function ofFile(filename) {
   })
 }
 
-export function ofFileSync(filename) {
+export function relativeFileChecksum(relativePath) {
+  return fileChecksum(path.join(PATHS.sass_dir, relativePath))
+}
+
+export function fileChecksumSync (filename) {
   try {
     return checksum(fs.readFileSync(filename))
   } catch(e) {}

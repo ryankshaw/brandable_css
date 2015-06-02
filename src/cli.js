@@ -1,33 +1,15 @@
 import program from 'commander'
-import main from './main'
-import compileSingleBundle from './compile-bundle'
+import {checkAll, startWatcher} from './main'
+import {onError} from './utils'
 
 program
   .version(require('../package').version)
   .option('--watch', 'watch for changes')
-  .option('--bundle <bundle>', 'compile a specific bundle')
-  .option('--variant <variant>', 'the variant (legacy_high_contrast, new_styles_normal_contrast, etc) you want')
-  .option('--brand-variables-folder <brandVarablesFolder>', 'filesystem path to the folder that contains the _brand_variables.scss you want to use')
+  // .option('--brand-config-md5 <md5>', 'compile just the styles for a specific Brand Config')
 
 program.parse(process.argv)
 
-// if they specified the specific bundle they want, (eg: from the brand_css rails controller),
-// compile that one bundle and send it to stdout
-if (program.bundle) {
-  compileSingleBundle({
-    bundleName: program.bundle,
-    variant: program.variant,
-    brandVariablesFolder: program.brandVariablesFolder
-  })
-    .then(function(res){ console.log(res.css) })
-    .catch(main.onError)
-} else {
-  main.checkAll().catch(main.onError)
-  if (program.watch) {
-    main.watch()
-  }
+checkAll().catch(onError)
+if (program.watch) {
+  startWatcher()
 }
-
-
-
-

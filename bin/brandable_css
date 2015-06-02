@@ -1,0 +1,8 @@
+#!/usr/bin/env node
+
+// without this, node only uses 4 of the available cores on my MacBookPro
+// see: http://www.future-processing.pl/blog/on-problems-with-threads-in-node-js/
+process.env.UV_THREADPOOL_SIZE = 6
+
+require("babel/polyfill")
+require('../lib/cli')

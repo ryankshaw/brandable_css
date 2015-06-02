@@ -1,8 +1,7 @@
 {
-  "name": "canvas_css",
-  "version": "0.0.5",
-  "description": "This is what we use to compile sass in canvas with all our variants and brand_css",
-  "main": "index.js",
+  "name": "brandable_css",
+  "version": "0.0.1",
+  "description": "This is what we use to compile sass in canvas-lms with all our variants and custom theme editor css",
   "scripts": {
     "build": "./node_modules/.bin/babel src --stage 0 --out-dir lib",
     "dev": "npm run build -- --watch",
@@ -12,13 +11,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ryankshaw/canvas_css.git"
+    "url": "https://github.com/ryankshaw/brandable_css.git"
   },
   "author": "Ryan Shaw <ryankshaw@gmail.com>",
   "license": "MIT",
-  "homepage": "https://github.com/ryankshaw/canvas_css",
+  "homepage": "https://github.com/ryankshaw/brandable_css",
   "bin": {
-    "canvas_css": "./bin/canvas_css"
+    "canvas_css": "./bin/brandable_css"
   },
   "dependencies": {
     "autoprefixer": "^5.1.1",
@@ -31,7 +30,6 @@
     "glob": "^5.0.6",
     "js-yaml": "^3.3.1",
     "lodash": "^3.8.0",
-    "mkdirp": "^0.5.1",
     "node-sass": "^3.1.0",
     "postcss": "^4.1.10",
     "postcss-url": "^3.2.0"

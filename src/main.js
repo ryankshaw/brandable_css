@@ -1,230 +1,269 @@
-import Promise from 'bluebird'
-const mkdirpAsync = Promise.promisify(require('mkdirp'))
-const writeFileAsync = Promise.promisify(require('fs').writeFile)
 const debug = require('debug')('canvas_css')
+import Promise from 'bluebird'
+const outputFile = Promise.promisify(require('fs-extra').outputFile)
+const glob = Promise.promisify(require('glob'))
+import zlib from 'zlib'
+const gzip = Promise.promisify(zlib.gzip)
 import path from 'path'
 import _ from 'lodash'
 import chalk from 'chalk'
 import chokidar from 'chokidar'
-import checksum, {ofFile} from './checksum'
+
+import {checksum, relativeFileChecksum} from './checksum'
 import compileSingleBundle from './compile-bundle'
-import {removePriorVersions, relativeSassPath, isSassPartial, readJson, outputJson, glob} from './utils'
-import PATHS from './paths'
-import VARIANTS from './variants'
+import {relativeSassPath, isSassPartial, folderForBrandId, getBrandIds, onError} from './utils'
+import {manifest_key_seperator, paths as PATHS} from './config'
+import VARIANTS, {BRANDABLE_VARIANTS} from './variants'
 import cache from './cache'
+import writeDefaultBrandableVariablesScss from 'write-brandable-variables-defaults-scss'
 
-export function onError(err){
-  console.error('error compiling sass', err, err.stack)
-  process.exit(1)
-}
 
-  // TODO: need to handle this case
-  // You can run this with with `node script/compile-sass.js app/stylesheets/jst/something.scss to compile a specific file.
-  // var sassFileToConvert = process.argv[2]
-  // var sassFiles = sassFileToConvert ? [sassFileToConvert] : glob.sync(globPattern)
-
-// this looks really crazy but it is the fastest way to find all the bundles that need to be rebuilt on startup
+// This looks really crazy but it is the fastest way to find all the bundles
+// that need to be rebuilt on startup
 async function findChangedBundles(bundles) {
   let changedFiles = new Set()
   let unchangedFiles = new Set()
-  let changedBundles = new Set()
-  async function updateChecksum (filename) {
-    const md5 = await fileChecksum(filename)
-    if (cache.file_checksums.data[filename] === md5) {
-      unchangedFiles.add(filename)
-    } else {
-      cache.file_checksums.update(filename, md5)
-    }
-    return md5
+  let toCompile = {}
+  const brandIds = await getBrandIds()
+
+  async function fasterHasFileChanged (filename) {
+    if (unchangedFiles.has(filename)) return false
+    if (changedFiles.has(filename)) return true
+    const iHaveChanged = await hasFileChanged(filename)
+    iHaveChanged ? changedFiles.add(filename) : unchangedFiles.add(filename)
+    return iHaveChanged
   }
+
   for (let bundleName of bundles) {
-    outer:
     for (let variant of VARIANTS){
-      let cached = _.get(cache.bundles_with_deps.data, [variant, bundleName])
+      const cached = cache.bundles_with_deps.data[[bundleName, variant].join(manifest_key_seperator)]
+      let thisVariantHasChanged = false
       if (!cached) {
-        changedBundles.add(bundleName)
+        thisVariantHasChanged = true
         changedFiles.add(bundleName)
-        break outer
       } else {
         for (let filename of cached.includedFiles) {
-          if (!unchangedFiles.has(filename) && (
-            changedFiles.has(filename) ||
-            !cache.file_checksums.data[filename] ||
-            cache.file_checksums.data[filename] != await updateChecksum(filename)
-          )) {
-            changedBundles.add(bundleName)
-            changedFiles.add(filename)
-            break outer
+          if (await fasterHasFileChanged(filename)) {
+            thisVariantHasChanged = true
+            break
+          }
+        }
+      }
+      if (thisVariantHasChanged) {
+        _.set(toCompile, [bundleName, variant], {})
+      }
+      if (BRANDABLE_VARIANTS.has(variant)) {
+        for (const brandId of brandIds) {
+          const brandVarFile = relativeSassPath(path.join(folderForBrandId(brandId), '_brand_variables.scss'))
+          if (thisVariantHasChanged || await fasterHasFileChanged(brandVarFile)) {
+            _.set(toCompile, [bundleName, variant, brandId], true)
           }
         }
       }
     }
   }
-  return [...changedBundles]
+  return toCompile
 }
 
 export async function checkAll(){
   debug('checking all sass bundles to see if they need updating')
   await writeDefaultBrandableVariablesScss()
-  const bundles =(await glob(PATHS.all_sass_bundles)).map(relativeSassPath)
+  const bundles = await glob(PATHS.all_sass_bundles).map(relativeSassPath)
+
   // remove any artifacts of bundles that are no longer on disk
-  _(cache.bundles_with_deps).map(_.keys).flatten().uniq().without(...bundles).forEach(onBundleDeleted).value()
+  // TODO DO we really need this?
+  // _(cache.bundles_with_deps).map(_.keys).flatten().uniq().without(...bundles).forEach(onBundleDeleted).value()
 
   const changedBundles = await findChangedBundles(bundles)
-  if (changedBundles.length) {
-    debug('these bundles have changed', changedBundles)
-    changedBundles.forEach(markAsChanged)
-  } else {
+  if (_.isEmpty(changedBundles)) {
     console.info(chalk.green('no changes detected'))
+    return
   }
+  debug('these bundles have changed', changedBundles)
+  return await processChangedBundles(changedBundles)
 }
 
-function fileChecksum(relativePath) {
-  return ofFile(path.join(PATHS.sass_dir, relativePath))
+function processChangedBundles(changedBundles) {
+  return Promise.map(Object.keys(changedBundles), (bundleName) => {
+    const variantsForThisBundle = changedBundles[bundleName]
+    const variantNames = Object.keys(variantsForThisBundle)
+    const firstVariantName = variantNames[0]
+
+    // compile the first variant of this bundle and if it doesn't include our custom 'variables' stuff
+    // we can just use that same result for all the other variants of this bundle
+    return compileBundle({variant: firstVariantName, bundleName}).then((firstResult) => {
+      const allOutputWillBeSame = !_.includes(firstResult.includedFiles, relativeSassPath(PATHS.brandable_variables_defaults_scss))
+      function copyOrCompile({variant, brandId, unbrandedCombinedChecksum}) {
+        if (allOutputWillBeSame) {
+          debug('just copying since it was same as first', bundleName, variant, brandId)
+          return writeCss({
+            css: firstResult.css,
+            combinedChecksum: firstResult.combinedChecksum,
+            includedFiles: firstResult.includedFiles,
+            gzipped: firstResult.gzipped,
+            variant,
+            bundleName,
+            brandId
+          })
+        }
+        return compileBundle({variant, bundleName, brandId, unbrandedCombinedChecksum})
+      }
+      return Promise.map(variantNames, (variant) => {
+        // Don't recompile bundle if it was the first one we did above.
+        const unbrandedResult = (variant === firstVariantName) ? firstResult : copyOrCompile({variant})
+        return Promise.resolve(unbrandedResult).then((unbrandedResult) => {
+          // The 'combinedChecksum' for the branded versions needs to be the same as the stock, unbranded result.
+          // That is the only way we can load css dynamically in handlebars/js files.
+          const unbrandedCombinedChecksum = unbrandedResult.combinedChecksum
+          return Promise.map(Object.keys(variantsForThisBundle), (brandId) => {
+            copyOrCompile({variant, brandId, unbrandedCombinedChecksum})
+          })
+        })
+      })
+    })
+  }).then(cache.saveAll)
 }
 
-async function checksumIsUpToDate(file) {
-  return cache.file_checksums.data[file] && cache.file_checksums.data[file] === await fileChecksum(file)
-}
-
-async function needsUpdate(variant, bundleName) {
-  const includedFiles = _.get(cache, ['bundles_with_deps', 'data', variant, bundleName, 'includedFiles'])
-  if (!includedFiles) return true
-  for (let filename of includedFiles) {
-    if (! await checksumIsUpToDate(filename)) return true
-  }
-  return false
-}
 
 async function getChecksum (relativePath) {
   let md5 = cache.file_checksums.data[relativePath]
   if (!md5) {
-    md5 = await fileChecksum(relativePath)
+    md5 = await relativeFileChecksum(relativePath)
     cache.file_checksums.update(relativePath, md5)
   }
 }
 
-async function compileBundle(variant, bundleName){
-  const {dir, name} = path.parse(bundleName)
-  const outputDir = path.join(PATHS.output_dir, variant, dir)
-  const [result] = await* [
-    compileSingleBundle({bundleName, variant}),
-    removePriorVersions(bundleName, variant),
-    mkdirpAsync(outputDir)
-  ]
+async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedChecksum}){
+  const result = await compileSingleBundle({bundleName, variant, brandId})
   const includedFiles = result.includedFiles.map(relativeSassPath)
   if (watcher) {
     result.includedFiles.forEach(f => watcher.add(f))
   }
-  const md5s = await Promise.all(includedFiles.map(getChecksum))
-  const combinedChecksum = checksum(result.css + md5s)
-  _.set(cache, ['bundles_with_deps', 'data', variant, bundleName], {combinedChecksum, includedFiles})
-  return await writeFileAsync(path.join(outputDir, `${name}_${combinedChecksum}.css`), result.css)
+
+  let combinedChecksum
+  if (brandId) {
+    if (!unbrandedCombinedChecksum) throw new Error('must provide unbrandedCombinedChecksum if compiling a branded bundle')
+    combinedChecksum = unbrandedCombinedChecksum
+  } else {
+    const md5s = Promise.all(includedFiles.map(getChecksum))
+    combinedChecksum = checksum(result.css + md5s)
+  }
+
+  const gzipped = await gzip(new Buffer(result.css), {level : zlib.Z_BEST_COMPRESSION})
+  const finalResult = {
+    css: result.css,
+    combinedChecksum,
+    gzipped,
+    variant,
+    bundleName,
+    brandId,
+    includedFiles,
+  }
+  await writeCss(finalResult)
+  return finalResult
+}
+
+async function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles, gzipped}) {
+  const {dir, name} = path.parse(bundleName)
+  const outputDir = path.join(PATHS.output_dir, brandId || '', variant, dir)
+  const filename = path.join(outputDir, `${name}-${combinedChecksum}.css`)
+  const cacheKey = [bundleName, variant]
+  if (brandId) cacheKey.push(brandId)
+  cache.bundles_with_deps.update(cacheKey.join(manifest_key_seperator), {combinedChecksum, includedFiles})
+  return await* [
+    outputFile(filename, css),
+    outputFile(filename + '.gz', gzipped)
+  ]
 }
 
 function onBundleDeleted(bundleName) {
-  for (var variant in cache.bundles_with_deps.data) {
-    delete cache.bundles_with_deps.data[variant][bundleName]
-  }
+  cache.bundles_with_deps.clearMatching(bundleName)
   cache.file_checksums.update(bundleName, undefined)
-  return Promise.all(VARIANTS.map(removePriorVersions.bind(null, bundleName)))
 }
 
 async function onFilesystemChange(eventType, filePath, details){
-  debug('onFilesystemChange', eventType, filePath)
-  if (details.type != 'file' || details.event == 'unknown') return
+  try {
+    debug('onFilesystemChange', eventType, filePath, details.type)
+    if (details.type != 'file' || details.event === 'unknown') return
 
-  if (filePath.match(PATHS.brandable_variables_json)){
-    return writeDefaultBrandableVariablesScssFile()
-  }
-  filePath = relativeSassPath(filePath)
+    if (filePath.match(PATHS.brandable_variables_json)){
+      debug(PATHS.brandable_variables_json, 'changed, saving to scss')
+      return await writeDefaultBrandableVariablesScssFile()
+    }
+    filePath = relativeSassPath(filePath)
 
-  if (eventType === 'deleted') {
-    cache.file_checksums.update(filePath, undefined)
-    if (!isSassPartial(filePath)) onBundleDeleted(filePath)
-    debug('unwatching', filePath)
-    watcher.unwatch(filePath)
-    return
-  }
-  if (!await checksumIsUpToDate(filePath)) {
-    markAsChanged(filePath)
+    if (eventType === 'deleted') {
+      cache.file_checksums.update(filePath, undefined)
+      if (!isSassPartial(filePath)) onBundleDeleted(filePath)
+      debug('unwatching', filePath)
+      watcher.unwatch(filePath)
+      return
+    }
+    if (await hasFileChanged(filePath)) {
+      debug('changed contents', filePath)
+      return await processChangedBundles(whatToCompileIfFileChanges(filePath))
+    }
+    debug('unchanged', filePath)
+  } catch(e) {
+    onError(e)
   }
 }
 
-var markAsChanged = (function(){
-  const seperator = '$$$$$'
-  var changedFiles = new Set()
-  var timerId
-
-  async function processChangedFiles() {
-    let bundlesToBuild = new Set()
-    for (let filePath of changedFiles) {
-      let isBundleRoot = !isSassPartial(filePath)
-      for (let variant of VARIANTS) {
-        if (isBundleRoot) {
-          bundlesToBuild.add(variant + seperator + filePath)
-        }
-        for (var bundleName in cache.bundles_with_deps.data[variant]) {
-          if (_.contains(cache.bundles_with_deps.data[variant][bundleName].includedFiles, filePath)) {
-            bundlesToBuild.add(variant + seperator + bundleName)
-          }
-        }
+function whatToCompileIfFileChanges (filename) {
+  let toCompile = {}
+  if (!isSassPartial(filename)) {
+    for (const variant of VARIANTS) {
+      _.set(toCompile, [bundleName, variant], {})
+    }
+    if (BRANDABLE_VARIANTS.has(variant)) {
+      for (const brandId of brandConfigs) {
+        _.set(toCompile, [bundleName, variant, brandId], true)
       }
     }
-    changedFiles.clear()
-    timerId = undefined
-
-    await Promise.all([...bundlesToBuild].map(function(key){
-      let [variant, bundleName] = key.split('$$$$$')
-      debug('compiling', variant, bundleName)
-      return compileBundle(variant, bundleName)
-    }))
-    debug('finished')
-
-    return await cache.saveAll()
+  } else {
+    for (const key in cache.bundles_with_deps.data) {
+      if (_.includes(cache.bundles_with_deps.data[key].includedFiles, filename)) {
+        _.set(toCompile, key.split(manifest_key_seperator), {})
+      }
+    }
   }
-
-  return function markAsChanged(filename) {
-    changedFiles.add(filename)
-    if (!timerId) timerId = setTimeout(function(){
-      processChangedFiles().catch(onError)
-    }, 50)
-  }
-})()
-
-async function updateChecksum(relativePath) {
-  let newMd5 = await fileChecksum(relativePath)
-  cache.file_checksums.update(relativeSassPath, newMd5)
+  // TODO: still need to handle if a new _brand_variables.scss gets saved.
+  // but maybe not because theme editor will explicitly run delayed job for that
+  // so we don't need to catch it with a filesystem watcher
+  // else if (is brand_variables.scss) {
+  return toCompile
 }
 
-async function writeDefaultBrandableVariablesScss(){
-  let fileContents = "// THIS FILE IS AUTOGENERATED by compile-sass. Make changes to: " + PATHS.brandable_variables_json
-  let variableGrous = await readJson(PATHS.brandable_variables_json)
-  variableGrous.forEach( variableGroup => {
-    variableGroup.variables.forEach( variable => {
-      let value = variable.default
-      if (variable.type === 'image') value = 'url("'+value+'")'
-      fileContents += '\n$'+variable.variable_name+': '+value+';'
-    })
-  })
-  return await outputJson(PATHS.brandable_variables_defaults_scss, fileContents)
+async function hasFileChanged(relativePath) {
+  const cached = cache.file_checksums.data[relativePath]
+  if (cached) {
+    const newMd5 = await relativeFileChecksum(relativePath)
+    return cached !== cache.file_checksums.update(relativePath, newMd5)
+  }
+  return true
 }
 
 var watcher
-export function watch() {
+const watched = new Set()
+function watch(filename) {
+  if (!watcher || watched.has(filename)) return
+  watched.add(filename)
+  watcher.add(filename)
+}
+function unwatch(filename) {
+  if (!watcher || !watched.delete(filename)) return
+  debug('unwatching', filename)
+  watcher.unwatch(filename)
+}
+export function startWatcher() {
   debug('watching for changes to any scss files')
   watcher = chokidar
     .watch(PATHS.brandable_variables_json, {persistent: true, cwd: PATHS.sass_dir})
-    .on('add', function(filename){ debug('file added to watcher', filename)})
+    .on('add', f => debug('file added to watcher', f))
     .add(PATHS.all_sass_bundles)
 
-  for (var variant in cache.bundles_with_deps.data) {
-    for (var bundleName in cache.bundles_with_deps.data[variant]) {
-      for (let filename of cache.bundles_with_deps.data[variant][bundleName].includedFiles) {
-        debug('adding', filename)
-        watcher.add(filename)
-      }
-    }
+  for (const key in cache.bundles_with_deps.data) {
+    cache.bundles_with_deps.data[key].includedFiles.forEach(watch)
   }
-  watcher.on('raw', () => onFilesystemChange().catch(onError))
+  watcher.on('raw', onFilesystemChange)
 }

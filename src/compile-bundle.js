@@ -1,7 +1,7 @@
+const debug = require('debug')('canvas_css:compile-bundle')
 import Promise from 'bluebird'
 const existsAsync = Promise.promisify(require('fs').stat)
 const sassRender = Promise.promisify(require('node-sass').render)
-const debug = require('debug')('canvas_css:compile-bundle')
 import path from 'path'
 import _ from 'lodash'
 import chalk from 'chalk'
@@ -9,31 +9,38 @@ import url from 'url'
 import postcss from 'postcss'
 import autoprefixer from 'autoprefixer'
 import postcssUrl from 'postcss-url'
-import PATHS from './paths'
-import {ofFileSync} from './checksum'
+import {paths as PATHS} from "./config"
+import {BRANDABLE_VARIANTS} from './variants'
+import {fileChecksumSync} from './checksum'
 import supportedBrowsers from './browser-support'
 import cache from './cache'
-import {relativeSassPath} from './utils'
+import {relativeSassPath, folderForBrandId} from './utils'
 
-// Any logging from compileSingleBundle needs to go to stderr so we can use stdout to
-// send css to rails controller when we compile a single bundle
+// If an image is in css source as url("/images/foo/bar.png"),
+// Rails-asset-pipeline makes it available at the url: "/assets/foo/bar-{md5}.png"
+function removeFirstDir(dir) {
+  return dir.split('/').slice(2).join('/')
+}
+function sprocketsFormattedUrl(originalUrl, md5) {
+  let parsedUrl = url.parse(originalUrl)
+  const {dir, name, ext} = path.posix.parse(parsedUrl.pathname)
+  parsedUrl.pathname = `/assets/${removeFirstDir(dir)}/${name}-${md5}${ext}`
+  return url.format(parsedUrl)
+}
+
 function warn() {
   console.error(chalk.yellow('canvas_css warning', ...arguments))
 }
 
-export default async function compileSingleBundle ({bundleName, variant, brandVariablesFolder}) {
+export default async function compileSingleBundle ({bundleName, variant, brandId}) {
   const sassFile = path.join(PATHS.sass_dir, bundleName)
   let includePaths = [PATHS.sass_dir, path.join(PATHS.sass_dir, 'variants', variant)]
   // pull in 'config/brand_variables.scss' if we should
-  if (brandVariablesFolder) {
-    if (
-      (variant === 'new_styles_normal_contrast' || variant === 'k12_normal_contrast') &&
-      await existsAsync(path.join(brandVariablesFolder, '_brand_variables.scss'))
-    ) {
-      includePaths.unshift(brandVariablesFolder)
-    } else {
-      throw new Error('invalid brandVariablesFolder or you tried to include it in a legacy or high contrast bundle')
-    }
+  if (brandId) {
+    if (!BRANDABLE_VARIANTS.has(variant)) throw new Error(`${variant} is not brandable`)
+    const fileExists = await existsAsync(path.join(folderForBrandId(brandId), '_brand_variables.scss'))
+    if (!fileExists) throw new Error(`_brand_variables.scss file not found for ${brandId}`)
+    includePaths.unshift(folderForBrandId(brandId))
   }
 
   let urlsFoundInCss = new Set()
@@ -47,7 +54,7 @@ export default async function compileSingleBundle ({bundleName, variant, brandVa
     const relativePath = relativeSassPath(pathToFile)
     let md5 = cache.file_checksums.data[relativePath]
     if (!md5) {
-      md5 = ofFileSync(pathToFile)
+      md5 = fileChecksumSync(pathToFile)
       if (!md5) {
         warn(sassFile, variant, 'contains a url() to:', originalUrl, 'which doesn\'t exist on disk')
         return originalUrl
@@ -55,10 +62,7 @@ export default async function compileSingleBundle ({bundleName, variant, brandVa
       cache.file_checksums.update(relativePath, md5)
     }
     urlsFoundInCss.add(pathToFile)
-
-    const {dir, name, ext} = path.posix.parse(parsedUrl.pathname)
-    parsedUrl.pathname = `/assets${dir}/${name}-${md5}${ext}`
-    return url.format(parsedUrl)
+    return sprocketsFormattedUrl(originalUrl, md5)
   }
 
   const startTime = new Date()

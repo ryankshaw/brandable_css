@@ -1,15 +1,9 @@
 import path from 'path'
-import _ from 'lodash'
 import Promise from 'bluebird'
 import fs from 'fs-extra'
-import PATHS from './paths'
-import VARIANTS from './variants'
+import {paths as PATHS} from "./config"
+const readdirAsync = Promise.promisify(fs.readdir)
 
-const unlink = Promise.promisify(fs.unlink)
-
-export const glob = Promise.promisify(require('glob'))
-export const readJson = Promise.promisify(fs.readJson)
-export const outputJson = Promise.promisify(fs.outputJson)
 
 export function readJsonSync(filename) {
   try {
@@ -19,11 +13,8 @@ export function readJsonSync(filename) {
   }
 }
 
-const MD5_PATTERN = _.repeat('[a-f0-9]', 32)
-
-export function removePriorVersions (bundleName, variant) {
-  const previousVersionsGlob = path.join(PATHS.output_dir, variant, `${bundleName}_${MD5_PATTERN}.css`)
-  return glob(previousVersionsGlob).map(unlink)
+export function folderForBrandId(brandId) {
+  return path.join(PATHS.branded_scss_folder, brandId)
 }
 
 export function relativeSassPath (absPath) {
@@ -32,4 +23,14 @@ export function relativeSassPath (absPath) {
 
 export function isSassPartial (filePath) {
   return path.basename(filePath)[0] === '_'
+}
+
+export function onError (err){
+  console.error('error compiling sass', err, err.stack, err.message)
+  process.exit(1)
+}
+
+
+export function getBrandIds (){
+  return readdirAsync(PATHS.branded_scss_folder).catch(() => [])
 }
