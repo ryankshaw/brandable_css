@@ -50,7 +50,7 @@ async function findChangedBundles(bundles) {
         }
       }
       if (thisVariantHasChanged) {
-        _.set(toCompile, [bundleName, variant], {})
+        _.set(toCompile, [bundleName, variant, 'compileSelf'], true)
       }
       if (BRANDABLE_VARIANTS.has(variant)) {
         for (const brandId of brandIds) {
@@ -84,44 +84,48 @@ export async function checkAll(){
 }
 
 function processChangedBundles(changedBundles) {
-  return Promise.map(Object.keys(changedBundles), (bundleName) => {
-    const variantsForThisBundle = changedBundles[bundleName]
-    const variantNames = Object.keys(variantsForThisBundle)
-    const firstVariantName = variantNames[0]
-
+  return Promise.all(_.map(changedBundles, async function(variants, bundleName) {
     // compile the first variant of this bundle and if it doesn't include our custom 'variables' stuff
     // we can just use that same result for all the other variants of this bundle
-    return compileBundle({variant: firstVariantName, bundleName}).then((firstResult) => {
-      const allOutputWillBeSame = !_.includes(firstResult.includedFiles, relativeSassPath(PATHS.brandable_variables_defaults_scss))
-      function copyOrCompile({variant, brandId, unbrandedCombinedChecksum}) {
-        if (allOutputWillBeSame) {
-          debug('just copying since it was same as first', bundleName, variant, brandId)
-          return writeCss({
-            css: firstResult.css,
-            combinedChecksum: firstResult.combinedChecksum,
-            includedFiles: firstResult.includedFiles,
-            gzipped: firstResult.gzipped,
-            variant,
-            bundleName,
-            brandId
-          })
-        }
-        return compileBundle({variant, bundleName, brandId, unbrandedCombinedChecksum})
-      }
-      return Promise.map(variantNames, (variant) => {
-        // Don't recompile bundle if it was the first one we did above.
-        const unbrandedResult = (variant === firstVariantName) ? firstResult : copyOrCompile({variant})
-        return Promise.resolve(unbrandedResult).then((unbrandedResult) => {
-          // The 'combinedChecksum' for the branded versions needs to be the same as the stock, unbranded result.
-          // That is the only way we can load css dynamically in handlebars/js files.
-          const unbrandedCombinedChecksum = unbrandedResult.combinedChecksum
-          return Promise.map(Object.keys(variantsForThisBundle[variant]), (brandId) => {
-            copyOrCompile({variant, brandId, unbrandedCombinedChecksum})
-          })
+    const firstUnbranded = _.find(Object.keys(variants), k => variants[k].compileSelf)
+    let firstResult, allOutputWillBeSame
+    if (firstUnbranded) {
+      firstResult = await compileBundle({variant: firstUnbranded, bundleName})
+      allOutputWillBeSame = !_.includes(firstResult.includedFiles, relativeSassPath(PATHS.brandable_variables_defaults_scss))
+    }
+    function copyOrCompile({variant, brandId, unbrandedCombinedChecksum}) {
+      if (allOutputWillBeSame) {
+        debug('just copying since it was same as first', bundleName, variant, brandId)
+        return writeCss({
+          css: firstResult.css,
+          combinedChecksum: firstResult.combinedChecksum,
+          includedFiles: firstResult.includedFiles,
+          gzipped: firstResult.gzipped,
+          variant,
+          bundleName,
+          brandId
         })
+      }
+      debug('combinde5', arguments)
+      return compileBundle({variant, bundleName, brandId, unbrandedCombinedChecksum})
+    }
+    await* Object.keys(variants).map(async function (variant) {
+      let unbrandedCombinedChecksum  = (allOutputWillBeSame && firstResult.combinedChecksum)
+
+      // Don't recompile bundle if it was the first one we did above.
+      if (variant !== firstUnbranded && variants[variant].compileSelf) {
+        unbrandedCombinedChecksum = (await copyOrCompile({variant})).combinedChecksum
+      }
+      // The 'combinedChecksum' for the branded versions needs to be the same as the stock, unbranded result.
+      // That is the only way we can load css dynamically in handlebars/js files.
+      if (!unbrandedCombinedChecksum) {
+        unbrandedCombinedChecksum = cache.bundles_with_deps.data[[bundleName, variant].join(manifest_key_seperator)]
+      }
+      await* Object.keys(variants[variant]).map((brandId) => {
+        return (brandId !== 'compileSelf') && copyOrCompile({variant, brandId, unbrandedCombinedChecksum})
       })
     })
-  }).then(cache.saveAll)
+  })).then(cache.saveAll)
 }
 
 
@@ -142,7 +146,7 @@ async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedCh
 
   let combinedChecksum
   if (brandId) {
-    if (!unbrandedCombinedChecksum) throw new Error('must provide unbrandedCombinedChecksum if compiling a branded bundle')
+    if (!unbrandedCombinedChecksum) throw new Error('must provide unbrandedCombinedChecksum if compiling a branded bundle' + variant + bundleName + brandId + unbrandedCombinedChecksum )
     combinedChecksum = unbrandedCombinedChecksum
   } else {
     const md5s = Promise.all(includedFiles.map(getChecksum))
@@ -213,7 +217,7 @@ function whatToCompileIfFileChanges (filename) {
   let toCompile = {}
   if (!isSassPartial(filename)) {
     for (const variant of VARIANTS) {
-      _.set(toCompile, [bundleName, variant], {})
+      _.set(toCompile, [bundleName, variant, 'compileSelf'], true)
     }
     if (BRANDABLE_VARIANTS.has(variant)) {
       for (const brandId of brandConfigs) {
@@ -223,7 +227,8 @@ function whatToCompileIfFileChanges (filename) {
   } else {
     for (const key in cache.bundles_with_deps.data) {
       if (_.includes(cache.bundles_with_deps.data[key].includedFiles, filename)) {
-        _.set(toCompile, key.split(manifest_key_seperator), {})
+        const [bundleName, variant, brandId] = key.split(manifest_key_seperator)
+        _.set(toCompile, [bundleName, variant, brandId || 'compileSelf'], true)
       }
     }
   }
@@ -236,11 +241,9 @@ function whatToCompileIfFileChanges (filename) {
 
 async function hasFileChanged(relativePath) {
   const cached = cache.file_checksums.data[relativePath]
-  if (cached) {
-    const newMd5 = await relativeFileChecksum(relativePath)
-    return cached !== cache.file_checksums.update(relativePath, newMd5)
-  }
-  return true
+  const current = await relativeFileChecksum(relativePath)
+  cache.file_checksums.update(relativePath, current)
+  return cached !== current
 }
 
 var watcher
