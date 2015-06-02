@@ -76,7 +76,7 @@ export async function checkAll(){
 
   const changedBundles = await findChangedBundles(bundles)
   if (_.isEmpty(changedBundles)) {
-    console.info(chalk.green('no changes detected'))
+    console.info(chalk.green('no sass changes detected'))
     return
   }
   debug('these bundles have changed', changedBundles)
@@ -115,7 +115,7 @@ function processChangedBundles(changedBundles) {
           // The 'combinedChecksum' for the branded versions needs to be the same as the stock, unbranded result.
           // That is the only way we can load css dynamically in handlebars/js files.
           const unbrandedCombinedChecksum = unbrandedResult.combinedChecksum
-          return Promise.map(Object.keys(variantsForThisBundle), (brandId) => {
+          return Promise.map(Object.keys(variantsForThisBundle[variant]), (brandId) => {
             copyOrCompile({variant, brandId, unbrandedCombinedChecksum})
           })
         })
