@@ -15,7 +15,7 @@ import {relativeSassPath, isSassPartial, folderForBrandId, getBrandIds, onError}
 import {manifest_key_seperator, paths as PATHS} from './config'
 import VARIANTS, {BRANDABLE_VARIANTS} from './variants'
 import cache from './cache'
-import writeDefaultBrandableVariablesScss from 'write-brandable-variables-defaults-scss'
+import writeDefaultBrandableVariablesScss from './write-brandable-variables-defaults-scss'
 
 
 // This looks really crazy but it is the fastest way to find all the bundles

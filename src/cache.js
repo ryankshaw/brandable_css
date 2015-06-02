@@ -2,7 +2,7 @@ const debug = require('debug')('canvas_css')
 import _ from 'lodash'
 import {readJsonSync} from './utils'
 import {paths as PATHS} from "./config"
-const outputJson = Promise.promisify(require('fs-extra').outputJson)
+const outputJson = require('bluebird').promisify(require('fs-extra').outputJson)
 
 const caches = ['file_checksums', 'bundles_with_deps']
 
