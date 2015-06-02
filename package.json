@@ -9,16 +9,12 @@
     "release": "npm shrinkwrap && npm version patch && git push && npm publish",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/ryankshaw/brandable_css.git"
-  },
+  "repository": "ryankshaw/brandable_css",
   "author": "Ryan Shaw <ryankshaw@gmail.com>",
   "license": "MIT",
   "homepage": "https://github.com/ryankshaw/brandable_css",
-  "bin": {
-    "brandable_css": "./bin/brandable_css"
-  },
+  "bin": "./bin/brandable_css",
+  "files" : ["bin", "lib"],
   "dependencies": {
     "autoprefixer": "^5.1.1",
     "bluebird": "^2.9.25",
