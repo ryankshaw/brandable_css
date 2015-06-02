@@ -1,6 +1,6 @@
 {
   "name": "brandable_css",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "This is what we use to compile sass in canvas-lms with all our variants and custom theme editor css",
   "scripts": {
     "build": "./node_modules/.bin/babel src --stage 0 --out-dir lib",
@@ -14,7 +14,10 @@
   "license": "MIT",
   "homepage": "https://github.com/ryankshaw/brandable_css",
   "bin": "./bin/brandable_css",
-  "files" : ["bin", "lib"],
+  "files": [
+    "bin",
+    "lib"
+  ],
   "dependencies": {
     "autoprefixer": "^5.1.1",
     "bluebird": "^2.9.25",
