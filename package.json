@@ -32,9 +32,7 @@
     "lodash": "^3.8.0",
     "node-sass": "^3.1.0",
     "postcss": "^4.1.10",
-    "postcss-url": "^3.2.0"
-  },
-  "devDependencies": {
+    "postcss-url": "^3.2.0",
     "babel": "^5.4.7"
   }
 }
