@@ -21,7 +21,7 @@ function initCache(name) {
     update(key, value) {
       if (_.isFunction(key)) throw new Error('cant use function as key' + key + value)
       if (self.data[key] === value) return value
-      debug('updating cache key', key, value)
+      debug('updating cache key', key)
       self.isSaved = false
       return self.data[key] = value
     },

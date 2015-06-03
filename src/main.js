@@ -18,25 +18,31 @@ import cache from './cache'
 import writeDefaultBrandableVariablesScss from './write-brandable-variables-defaults-scss'
 
 
+function joined() {
+  return [].join.call(arguments, manifest_key_seperator)
+}
+
 // This looks really crazy but it is the fastest way to find all the bundles
 // that need to be rebuilt on startup
-async function findChangedBundles(bundles) {
-  let changedFiles = new Set()
-  let unchangedFiles = new Set()
-  let toCompile = {}
-  const brandIds = await getBrandIds()
+async function findChangedBundles(bundles, onlyCheckThisBrandId) {
+  const changedFiles = new Set()
+  const unchangedFiles = new Set()
+  const toCompile = {}
+  const brandIds = onlyCheckThisBrandId ? [onlyCheckThisBrandId] : await getBrandIds()
+  const variants = onlyCheckThisBrandId ? BRANDABLE_VARIANTS : VARIANTS
 
   async function fasterHasFileChanged (filename) {
     if (unchangedFiles.has(filename)) return false
     if (changedFiles.has(filename)) return true
     const iHaveChanged = await hasFileChanged(filename)
     iHaveChanged ? changedFiles.add(filename) : unchangedFiles.add(filename)
+    if (iHaveChanged) debug(filename, 'changed')
     return iHaveChanged
   }
 
   for (let bundleName of bundles) {
-    for (let variant of VARIANTS){
-      const cached = cache.bundles_with_deps.data[[bundleName, variant].join(manifest_key_seperator)]
+    for (let variant of variants){
+      const cached = cache.bundles_with_deps.data[joined(bundleName, variant)]
       let thisVariantHasChanged = false
       if (!cached) {
         thisVariantHasChanged = true
@@ -49,7 +55,7 @@ async function findChangedBundles(bundles) {
           }
         }
       }
-      if (thisVariantHasChanged) {
+      if (thisVariantHasChanged && !onlyCheckThisBrandId) {
         _.set(toCompile, [bundleName, variant, 'compileSelf'], true)
       }
       if (BRANDABLE_VARIANTS.has(variant)) {
@@ -65,7 +71,7 @@ async function findChangedBundles(bundles) {
   return toCompile
 }
 
-export async function checkAll(){
+export async function checkAll({brandId}){
   debug('checking all sass bundles to see if they need updating')
   await writeDefaultBrandableVariablesScss()
   const bundles = await glob(PATHS.all_sass_bundles).map(relativeSassPath)
@@ -74,7 +80,7 @@ export async function checkAll(){
   // TODO DO we really need this?
   // _(cache.bundles_with_deps).map(_.keys).flatten().uniq().without(...bundles).forEach(onBundleDeleted).value()
 
-  const changedBundles = await findChangedBundles(bundles)
+  const changedBundles = await findChangedBundles(bundles, brandId)
   if (_.isEmpty(changedBundles)) {
     console.info(chalk.green('no sass changes detected'))
     return
@@ -85,48 +91,41 @@ export async function checkAll(){
 
 function processChangedBundles(changedBundles) {
   return Promise.all(_.map(changedBundles, async function(variants, bundleName) {
-    // compile the first variant of this bundle and if it doesn't include our custom 'variables' stuff
-    // we can just use that same result for all the other variants of this bundle
-    const firstUnbranded = _.find(Object.keys(variants), k => variants[k].compileSelf)
-    let firstResult, allOutputWillBeSame
-    if (firstUnbranded) {
-      firstResult = await compileBundle({variant: firstUnbranded, bundleName})
-      allOutputWillBeSame = !_.includes(firstResult.includedFiles, relativeSassPath(PATHS.brandable_variables_defaults_scss))
-    }
-    function copyOrCompile({variant, brandId, unbrandedCombinedChecksum}) {
+    let allOutputWillBeSame, sharedResult
+    async function copyOrCompile({variant, brandId, unbrandedCombinedChecksum}) {
       if (allOutputWillBeSame) {
-        debug('just copying since it was same as first', bundleName, variant, brandId)
+        debug('just copying', bundleName, variant, brandId)
         return writeCss({
-          css: firstResult.css,
-          combinedChecksum: firstResult.combinedChecksum,
-          includedFiles: firstResult.includedFiles,
-          gzipped: firstResult.gzipped,
+          css: sharedResult.css,
+          combinedChecksum: unbrandedCombinedChecksum || sharedResult.combinedChecksum,
+          includedFiles: sharedResult.includedFiles,
+          gzipped: sharedResult.gzipped,
           variant,
           bundleName,
           brandId
         })
       }
-      return compileBundle({variant, bundleName, brandId, unbrandedCombinedChecksum})
+      const result = await compileBundle({variant, bundleName, brandId, unbrandedCombinedChecksum})
+      if (typeof allOutputWillBeSame === 'undefined') {
+        allOutputWillBeSame = !_.includes(result.includedFiles, relativeSassPath(PATHS.brandable_variables_defaults_scss))
+        if (allOutputWillBeSame) sharedResult = result
+      }
+      return result
     }
     await* Object.keys(variants).map(async function (variant) {
-      let unbrandedCombinedChecksum  = (allOutputWillBeSame && firstResult.combinedChecksum)
+      let unbrandedCombinedChecksum = sharedResult && sharedResult.combinedChecksum
+      let compileSelf = variants[variant].compileSelf
+      const brandIds = Object.keys(variants[variant]).filter(k => k != 'compileSelf')
 
-      // Don't recompile bundle if it was the first one we did above.
-      if (variant !== firstUnbranded && variants[variant].compileSelf) {
-        unbrandedCombinedChecksum = (await copyOrCompile({variant})).combinedChecksum
-      }
       // The 'combinedChecksum' for the branded versions needs to be the same as the stock, unbranded result.
       // That is the only way we can load css dynamically in handlebars/js files.
-      if (!unbrandedCombinedChecksum) {
-        unbrandedCombinedChecksum = cache.bundles_with_deps.data[[bundleName, variant].join(manifest_key_seperator)]
-      }
-      await* Object.keys(variants[variant]).map((brandId) => {
-        return (brandId !== 'compileSelf') && copyOrCompile({variant, brandId, unbrandedCombinedChecksum})
-      })
+      // so if we dont have one to use by now, we have to compileSelf anyway so we can use it.
+      if (brandIds.length && !unbrandedCombinedChecksum) compileSelf = true
+      if (compileSelf) unbrandedCombinedChecksum = (await copyOrCompile({variant})).combinedChecksum
+      return await* brandIds.map(brandId => copyOrCompile({variant, brandId, unbrandedCombinedChecksum}))
     })
   })).then(cache.saveAll)
 }
-
 
 async function getChecksum (relativePath) {
   let md5 = cache.file_checksums.data[relativePath]
@@ -137,21 +136,15 @@ async function getChecksum (relativePath) {
 }
 
 async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedChecksum}){
+  if (brandId && !unbrandedCombinedChecksum) throw new Error('must provide unbrandedCombinedChecksum if compiling a branded bundle')
   const result = await compileSingleBundle({bundleName, variant, brandId})
   const includedFiles = result.includedFiles.map(relativeSassPath)
   if (watcher) {
     result.includedFiles.forEach(f => watcher.add(f))
   }
 
-  let combinedChecksum
-  if (brandId) {
-    if (!unbrandedCombinedChecksum) throw new Error('must provide unbrandedCombinedChecksum if compiling a branded bundle' + variant + bundleName + brandId + unbrandedCombinedChecksum )
-    combinedChecksum = unbrandedCombinedChecksum
-  } else {
-    const md5s = Promise.all(includedFiles.map(getChecksum))
-    combinedChecksum = checksum(result.css + md5s)
-  }
-
+  const md5s = await* includedFiles.map(getChecksum)
+  const combinedChecksum = brandId ? unbrandedCombinedChecksum : checksum(result.css + md5s)
   const gzipped = await gzip(new Buffer(result.css), {level : zlib.Z_BEST_COMPRESSION})
   const finalResult = {
     css: result.css,
@@ -172,7 +165,7 @@ async function writeCss ({css, variant, bundleName, brandId, combinedChecksum, i
   const filename = path.join(outputDir, `${name}-${combinedChecksum}.css`)
   const cacheKey = [bundleName, variant]
   if (brandId) cacheKey.push(brandId)
-  cache.bundles_with_deps.update(cacheKey.join(manifest_key_seperator), {combinedChecksum, includedFiles})
+  cache.bundles_with_deps.update(joined(...cacheKey), {combinedChecksum, includedFiles})
   return await* [
     outputFile(filename, css),
     outputFile(filename + '.gz', gzipped)
