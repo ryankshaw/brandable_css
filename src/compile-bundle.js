@@ -83,7 +83,7 @@ export default async function compileSingleBundle ({bundleName, variant, brandId
   ]).process(nodeSassResult.css, {from: sassFile})
 
   postcssResult.warnings().forEach(warn)
-  console.warn(chalk.green('compiled', bundleName, variant, brandId || '', 'in'), new Date() - startTime, 'ms')
+  console.log(chalk.green('compiled', bundleName, variant, brandId || '', 'in'), new Date() - startTime, 'ms')
 
   return {
     css: postcssResult.css,
