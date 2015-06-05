@@ -1,6 +1,6 @@
 {
   "name": "brandable_css",
-  "version": "0.0.21",
+  "version": "0.0.22",
   "description": "This is what we use to compile sass in canvas-lms with all our variants and custom theme editor css",
   "scripts": {
     "build": "./node_modules/.bin/babel src --stage 0 --out-dir lib",
