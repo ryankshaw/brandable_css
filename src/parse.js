@@ -28,7 +28,6 @@ if (path && path.posix && path.posix.parse) {
 // DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
-var util = require('util');
 
 // Split a filename into [root, dir, basename, ext], unix version
 // 'root' is just a slash, or nothing.
@@ -42,11 +41,6 @@ function posixSplitPath(filename) {
 }
 
 posix.parse = function(pathString) {
-  if (!util.isString(pathString)) {
-    throw new TypeError(
-        "Parameter 'pathString' must be a string, not " + typeof pathString
-    );
-  }
   var allParts = posixSplitPath(pathString);
   if (!allParts || allParts.length !== 4) {
     throw new TypeError("Invalid path '" + pathString + "'");
