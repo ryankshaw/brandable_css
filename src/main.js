@@ -61,7 +61,7 @@ async function findChangedBundles(bundles, onlyCheckThisBrandId) {
       if (BRANDABLE_VARIANTS.has(variant)) {
         for (const brandId of brandIds) {
           const brandVarFile = relativeSassPath(path.join(folderForBrandId(brandId), '_brand_variables.scss'))
-          if (thisVariantHasChanged || await fasterHasFileChanged(brandVarFile)) {
+          if ((await fasterHasFileChanged(brandVarFile)) || thisVariantHasChanged) {
             _.set(toCompile, [bundleName, variant, brandId], true)
           }
         }

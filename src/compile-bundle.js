@@ -49,7 +49,7 @@ export default async function compileSingleBundle ({bundleName, variant, brandId
   function putMD5sInUrls(originalUrl) {
     const parsedUrl = url.parse(originalUrl)
     if (parsedUrl.host || parsedUrl.href.indexOf('//') === 0 || !parsedUrl.path) {
-      warn(opts.sassFile, 'has an external url() to:', originalUrl, 'that\'s not a problem but normally our css only links to files in our repo')
+      warn(sassFile, 'has an external url() to:', originalUrl, 'that\'s not a problem but normally our css only links to files in our repo')
       return originalUrl
     }
     const pathToFile = path.join(PATHS.public_dir, parsedUrl.pathname)
