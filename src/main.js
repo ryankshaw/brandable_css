@@ -18,7 +18,6 @@ import cache from './cache'
 import writeDefaultBrandableVariablesScss from './write-brandable-variables-defaults-scss'
 import parse from './parse'
 
-
 function joined() {
   return [].join.call(arguments, manifest_key_seperator)
 }
@@ -146,7 +145,13 @@ async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedCh
 
   const md5s = await* includedFiles.map(getChecksum)
   const combinedChecksum = brandId ? unbrandedCombinedChecksum : checksum(result.css + md5s)
-  const gzipped = await gzip(new Buffer(result.css), {level : zlib.Z_BEST_COMPRESSION})
+
+  const buffered = new Buffer(result.css)
+  // node 0.10 doesn't allow passing an options object
+  const gzipped = await ( /^v0\.10/.test(process.version) ?
+    gzip(buffered) :
+    gzip(buffered, {level : zlib.Z_BEST_COMPRESSION})
+  )
   const finalResult = {
     css: result.css,
     combinedChecksum,
