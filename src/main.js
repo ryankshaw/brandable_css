@@ -16,6 +16,7 @@ import {manifest_key_seperator, paths as PATHS} from './config'
 import VARIANTS, {BRANDABLE_VARIANTS} from './variants'
 import cache from './cache'
 import writeDefaultBrandableVariablesScss from './write-brandable-variables-defaults-scss'
+import parse from './parse'
 
 
 function joined() {
@@ -160,7 +161,7 @@ async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedCh
 }
 
 async function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles, gzipped}) {
-  const {dir, name} = path.parse(bundleName)
+  const {dir, name} = parse(bundleName)
   const outputDir = path.join(PATHS.output_dir, brandId || '', variant, dir)
   const filename = path.join(outputDir, `${name}-${combinedChecksum}.css`)
   const cacheKey = [bundleName, variant]

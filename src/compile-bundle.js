@@ -14,6 +14,7 @@ import {BRANDABLE_VARIANTS} from './variants'
 import {fileChecksumSync} from './checksum'
 import supportedBrowsers from './browser-support'
 import cache from './cache'
+import parse from './parse'
 import {relativeSassPath, folderForBrandId} from './utils'
 
 // If an image is in css source as url("/images/foo/bar.png"),
@@ -23,7 +24,8 @@ function removeFirstDir(dir) {
 }
 function sprocketsFormattedUrl(originalUrl, md5) {
   let parsedUrl = url.parse(originalUrl)
-  const {dir, name, ext} = path.posix.parse(parsedUrl.pathname)
+
+  const {dir, name, ext} = parse(parsedUrl.pathname)
   parsedUrl.pathname = `/assets/${removeFirstDir(dir)}/${name}-${md5}${ext}`
   return url.format(parsedUrl)
 }
