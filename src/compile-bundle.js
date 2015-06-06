@@ -11,6 +11,7 @@ import autoprefixer from 'autoprefixer'
 import postcssUrl from 'postcss-url'
 import {paths as PATHS} from "./config"
 import {BRANDABLE_VARIANTS} from './variants'
+import SASS_STYLE from './sass_style'
 import {fileChecksumSync} from './checksum'
 import supportedBrowsers from './browser-support'
 import cache from './cache'
@@ -71,9 +72,8 @@ export default async function compileSingleBundle ({bundleName, variant, brandId
   const nodeSassResult = await sassRender({
     file: sassFile,
     includePaths: includePaths,
-    // if you want compressed output (eg: in production), set the environment variable  CANVAS_SASS_STYLE=compressed
-    outputStyle: process.env.CANVAS_SASS_STYLE || 'nested',
-    sourceComments: process.env.CANVAS_SASS_STYLE !== 'compressed',
+    outputStyle: SASS_STYLE,
+    sourceComments: SASS_STYLE !== 'compressed',
     sourceMap: false
   })
 

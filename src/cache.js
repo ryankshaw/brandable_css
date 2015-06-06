@@ -1,7 +1,8 @@
 const debug = require('debug')('canvas_css')
 import _ from 'lodash'
 import {readJsonSync} from './utils'
-import {paths as PATHS} from "./config"
+import {paths as PATHS} from './config'
+import SASS_STYLE from './sass_style'
 const outputJson = require('bluebird').promisify(require('fs-extra').outputJson)
 
 const caches = ['file_checksums', 'bundles_with_deps']
@@ -15,7 +16,7 @@ let cache = {
 function initCache(name) {
   const filename = PATHS[name]
   let self = {
-    data: readJsonSync(filename),
+    data: readJsonSync(filename + SASS_STYLE),
     isSaved: false,
 
     update(key, value) {
