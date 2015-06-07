@@ -70,12 +70,15 @@ async function findChangedBundles(bundles, onlyCheckThisBrandId) {
       if (BRANDABLE_VARIANTS.has(variant)) {
         for (const brandId of brandIds) {
           const brandVarFile = relativeSassPath(path.join(folderForBrandId(brandId), '_brand_variables.scss'))
-          const compileThisBrand = fasterHasFileChanged(brandVarFile) || thisVariantHasChanged || !fs.existsSync(cssFilename({
-            bundleName,
-            variant,
-            brandId,
-            combinedChecksum: cache.bundles_with_deps.data[joined(bundleName, variant, brandId)].combinedChecksum
-          }))
+          let compileThisBrand = fasterHasFileChanged(brandVarFile) || thisVariantHasChanged
+          if (!compileThisBrand) {
+            const cachedBrand = cache.bundles_with_deps.data[joined(bundleName, variant, brandId)]
+            compileThisBrand = !cachedBrand || !fs.existsSync(cssFilename({
+              bundleName,
+              variant,
+              brandId,
+              combinedChecksum: cachedBrand.combinedChecksum
+            }))
           if (compileThisBrand) {
             _.set(toCompile, [bundleName, variant, brandId], true)
           }
