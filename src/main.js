@@ -79,6 +79,7 @@ async function findChangedBundles(bundles, onlyCheckThisBrandId) {
               brandId,
               combinedChecksum: cachedBrand.combinedChecksum
             }))
+          }
           if (compileThisBrand) {
             _.set(toCompile, [bundleName, variant, brandId], true)
           }
