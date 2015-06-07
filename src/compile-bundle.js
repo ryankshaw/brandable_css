@@ -1,4 +1,3 @@
-const debug = require('debug')('canvas_css:compile-bundle')
 import Promise from 'bluebird'
 const existsAsync = Promise.promisify(require('fs').stat)
 const sassRender = Promise.promisify(require('node-sass').render)
@@ -16,7 +15,7 @@ import {fileChecksumSync} from './checksum'
 import supportedBrowsers from './browser-support'
 import cache from './cache'
 import parse from './parse'
-import {relativeSassPath, folderForBrandId} from './utils'
+import {debug, relativeSassPath, folderForBrandId} from './utils'
 
 // If an image is in css source as url("/images/foo/bar.png"),
 // Rails-asset-pipeline makes it available at the url: "/assets/foo/bar-{md5}.png"

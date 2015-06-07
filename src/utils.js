@@ -1,3 +1,4 @@
+export const debug = require('debug')('brandable_css')
 import path from 'path'
 import Promise from 'bluebird'
 import fs from 'fs-extra'
@@ -6,9 +7,11 @@ const readdirAsync = Promise.promisify(fs.readdir)
 
 
 export function readJsonSync(filename) {
+  debug('reading', filename)
   try {
     return fs.readJsonSync(filename)
   } catch(e) {
+    debug("couldn't read", filename, 'using empty cache')
     return {}
   }
 }

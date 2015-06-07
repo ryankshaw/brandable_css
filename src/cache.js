@@ -14,9 +14,9 @@ let cache = {
 }
 
 function initCache(name) {
-  const filename = PATHS[name]
+  const filename = PATHS[name] + SASS_STYLE
   let self = {
-    data: readJsonSync(filename + SASS_STYLE),
+    data: readJsonSync(filename),
     isSaved: false,
 
     update(key, value) {

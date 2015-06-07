@@ -22,7 +22,7 @@ export function fileChecksum (filename) {
     var s = fs.ReadStream(filename)
     s.on('data', ::hsh.update)
     s.on('end', () => resolve(hsh.digest('hex')))
-    s.on('error', resolve)
+    s.on('error', reject)
   })
 }
 
@@ -33,7 +33,9 @@ export function relativeFileChecksum(relativePath) {
 export function fileChecksumSync (filename) {
   try {
     return checksum(fs.readFileSync(filename))
-  } catch(e) {}
+  } catch(e) {
+    return ''
+  }
 }
 
 

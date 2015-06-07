@@ -1,6 +1,6 @@
-const debug = require('debug')('canvas_css')
 import Promise from 'bluebird'
-const outputFile = Promise.promisify(require('fs-extra').outputFile)
+import fs from 'fs-extra'
+const outputFile = Promise.promisify(fs.outputFile)
 const glob = Promise.promisify(require('glob'))
 import zlib from 'zlib'
 const gzip = Promise.promisify(zlib.gzip)
@@ -11,7 +11,7 @@ import chokidar from 'chokidar'
 
 import {checksum, relativeFileChecksum} from './checksum'
 import compileSingleBundle from './compile-bundle'
-import {relativeSassPath, isSassPartial, folderForBrandId, getBrandIds, onError} from './utils'
+import {debug, relativeSassPath, isSassPartial, folderForBrandId, getBrandIds, onError} from './utils'
 import {manifest_key_seperator, paths as PATHS} from './config'
 import VARIANTS, {BRANDABLE_VARIANTS} from './variants'
 import cache from './cache'
@@ -44,7 +44,7 @@ async function findChangedBundles(bundles, onlyCheckThisBrandId) {
     for (let variant of variants){
       const cached = cache.bundles_with_deps.data[joined(bundleName, variant)]
       let thisVariantHasChanged = false
-      if (!cached) {
+      if (!cached || !fs.existsSync(cssFilename({bundleName, variant, combinedChecksum: cached.combinedChecksum}))) {
         thisVariantHasChanged = true
         changedFiles.add(bundleName)
       } else {
@@ -61,7 +61,13 @@ async function findChangedBundles(bundles, onlyCheckThisBrandId) {
       if (BRANDABLE_VARIANTS.has(variant)) {
         for (const brandId of brandIds) {
           const brandVarFile = relativeSassPath(path.join(folderForBrandId(brandId), '_brand_variables.scss'))
-          if ((await fasterHasFileChanged(brandVarFile)) || thisVariantHasChanged) {
+          const compileThisBrand = ((await fasterHasFileChanged(brandVarFile)) || thisVariantHasChanged) || !fs.existsSync(cssFilename({
+            bundleName,
+            variant,
+            brandId,
+            combinedChecksum: cache.bundles_with_deps.data[joined(bundleName, variant, brandId)].combinedChecksum
+          }))
+          if (compileThisBrand) {
             _.set(toCompile, [bundleName, variant, brandId], true)
           }
         }
@@ -165,13 +171,17 @@ async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedCh
   return finalResult
 }
 
-async function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles, gzipped}) {
+function cssFilename({bundleName, variant, brandId, combinedChecksum}) {
   const {dir, name} = parse(bundleName)
   const outputDir = path.join(PATHS.output_dir, brandId || '', variant, dir)
-  const filename = path.join(outputDir, `${name}-${combinedChecksum}.css`)
+  return path.join(outputDir, `${name}-${combinedChecksum}.css`)
+}
+
+async function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles, gzipped}) {
   const cacheKey = [bundleName, variant]
   if (brandId) cacheKey.push(brandId)
   cache.bundles_with_deps.update(joined(...cacheKey), {combinedChecksum, includedFiles})
+  const filename = cssFilename({bundleName, variant, brandId, combinedChecksum})
   return await* [
     outputFile(filename, css),
     outputFile(filename + '.gz', gzipped)
