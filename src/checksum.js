@@ -1,5 +1,4 @@
 import crypto from 'crypto'
-import Promise from 'bluebird'
 import fs from 'fs'
 import path from 'path'
 import versions from './versions'
@@ -16,18 +15,8 @@ export function checksum (data) {
   return newHash().update(data).digest('hex')
 }
 
-export function fileChecksum (filename) {
-  return new Promise(function(resolve, reject){
-    var hsh = newHash()
-    var s = fs.ReadStream(filename)
-    s.on('data', ::hsh.update)
-    s.on('end', () => resolve(hsh.digest('hex')))
-    s.on('error', reject)
-  })
-}
-
 export function relativeFileChecksum(relativePath) {
-  return fileChecksum(path.join(PATHS.sass_dir, relativePath))
+  return fileChecksumSync(path.join(PATHS.sass_dir, relativePath))
 }
 
 export function fileChecksumSync (filename) {

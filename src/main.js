@@ -11,7 +11,7 @@ import chokidar from 'chokidar'
 
 import {checksum, relativeFileChecksum} from './checksum'
 import compileSingleBundle from './compile-bundle'
-import {debug, relativeSassPath, isSassPartial, folderForBrandId, getBrandIds, onError} from './utils'
+import {debug, relativeSassPath, isSassPartial, folderForBrandId, onError} from './utils'
 import {manifest_key_seperator, paths as PATHS} from './config'
 import VARIANTS, {BRANDABLE_VARIANTS} from './variants'
 import cache from './cache'
@@ -22,19 +22,28 @@ function joined() {
   return [].join.call(arguments, manifest_key_seperator)
 }
 
+function getBrandIds() {
+  try {
+    return fs.readdirSync(PATHS.branded_scss_folder)
+  } catch(e) {
+    return []
+  }
+}
+
 // This looks really crazy but it is the fastest way to find all the bundles
 // that need to be rebuilt on startup
 async function findChangedBundles(bundles, onlyCheckThisBrandId) {
   const changedFiles = new Set()
   const unchangedFiles = new Set()
   const toCompile = {}
-  const brandIds = onlyCheckThisBrandId ? [onlyCheckThisBrandId] : await getBrandIds()
+  const brandIds = onlyCheckThisBrandId ? [onlyCheckThisBrandId] : getBrandIds()
   const variants = onlyCheckThisBrandId ? BRANDABLE_VARIANTS : VARIANTS
 
-  async function fasterHasFileChanged (filename) {
+  function fasterHasFileChanged (filename) {
+    debug('checking', filename)
     if (unchangedFiles.has(filename)) return false
     if (changedFiles.has(filename)) return true
-    const iHaveChanged = await hasFileChanged(filename)
+    const iHaveChanged = hasFileChanged(filename)
     iHaveChanged ? changedFiles.add(filename) : unchangedFiles.add(filename)
     if (iHaveChanged) debug(filename, 'changed')
     return iHaveChanged
@@ -49,7 +58,7 @@ async function findChangedBundles(bundles, onlyCheckThisBrandId) {
         changedFiles.add(bundleName)
       } else {
         for (let filename of cached.includedFiles) {
-          if (await fasterHasFileChanged(filename)) {
+          if (fasterHasFileChanged(filename)) {
             thisVariantHasChanged = true
             break
           }
@@ -61,7 +70,7 @@ async function findChangedBundles(bundles, onlyCheckThisBrandId) {
       if (BRANDABLE_VARIANTS.has(variant)) {
         for (const brandId of brandIds) {
           const brandVarFile = relativeSassPath(path.join(folderForBrandId(brandId), '_brand_variables.scss'))
-          const compileThisBrand = ((await fasterHasFileChanged(brandVarFile)) || thisVariantHasChanged) || !fs.existsSync(cssFilename({
+          const compileThisBrand = fasterHasFileChanged(brandVarFile) || thisVariantHasChanged || !fs.existsSync(cssFilename({
             bundleName,
             variant,
             brandId,
@@ -133,10 +142,10 @@ function processChangedBundles(changedBundles) {
   })).then(cache.saveAll)
 }
 
-async function getChecksum (relativePath) {
+function getChecksum (relativePath) {
   let md5 = cache.file_checksums.data[relativePath]
   if (!md5) {
-    md5 = await relativeFileChecksum(relativePath)
+    md5 = relativeFileChecksum(relativePath)
     cache.file_checksums.update(relativePath, md5)
   }
 }
@@ -149,7 +158,7 @@ async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedCh
     result.includedFiles.forEach(f => watcher.add(f))
   }
 
-  const md5s = await* includedFiles.map(getChecksum)
+  const md5s = includedFiles.map(getChecksum)
   const combinedChecksum = brandId ? unbrandedCombinedChecksum : checksum(result.css + md5s)
 
   const buffered = new Buffer(result.css)
@@ -211,7 +220,7 @@ async function onFilesystemChange(eventType, filePath, details){
       watcher.unwatch(filePath)
       return
     }
-    if (await hasFileChanged(filePath)) {
+    if (hasFileChanged(filePath)) {
       debug('changed contents', filePath)
       return await processChangedBundles(whatToCompileIfFileChanges(filePath))
     }
@@ -247,9 +256,9 @@ function whatToCompileIfFileChanges (filename) {
   return toCompile
 }
 
-async function hasFileChanged(relativePath) {
+function hasFileChanged(relativePath) {
   const cached = cache.file_checksums.data[relativePath]
-  const current = await relativeFileChecksum(relativePath)
+  const current = relativeFileChecksum(relativePath)
   cache.file_checksums.update(relativePath, current)
   return cached !== current
 }
