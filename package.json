@@ -20,18 +20,19 @@
   ],
   "dependencies": {
     "autoprefixer": "^5.2.0",
+    "babel": "^5.4.7",
     "bluebird": "^2.9.27",
     "chalk": "^1.0.0",
     "chokidar": "^1.0.3",
     "commander": "^2.8.1",
     "debug": "^2.2.0",
-    "fs-extra": "^0.18.3",
+    "fs-extra": "^0.20.1",
     "glob": "^5.0.6",
     "js-yaml": "^3.3.1",
     "lodash": "^3.8.0",
     "node-sass": "^3.1.0",
     "postcss": "^4.1.10",
-    "postcss-url": "^3.2.0",
-    "babel": "^5.4.7"
+    "postcss-url": "^4.0.0",
+    "rev-hash": "^1.0.0"
   }
 }

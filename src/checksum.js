@@ -1,18 +1,15 @@
-import crypto from 'crypto'
+import revHash from 'rev-hash'
 import fs from 'fs'
 import path from 'path'
 import versions from './versions'
 import {paths as PATHS} from './config'
 
-
-function newHash() {
-  let hash = crypto.createHash('md5')
-  versions.forEach(::hash.update)
-  return hash
-}
-
 export function checksum (data) {
-  return newHash().update(data).digest('hex')
+  if (typeof data === 'string') {
+    data = new Buffer(data)
+  }
+  // we use revHash here because that is the same thing 'gulp-rev' uses
+  return revHash(data)
 }
 
 export function relativeFileChecksum(relativePath) {
@@ -26,5 +23,3 @@ export function fileChecksumSync (filename) {
     return ''
   }
 }
-
-

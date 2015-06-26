@@ -17,16 +17,11 @@ import cache from './cache'
 import parse from './parse'
 import {debug, relativeSassPath, folderForBrandId} from './utils'
 
-// If an image is in css source as url("/images/foo/bar.png"),
-// Rails-asset-pipeline makes it available at the url: "/assets/foo/bar-{md5}.png"
-function removeFirstDir(dir) {
-  return dir.split('/').slice(2).join('/')
-}
-function sprocketsFormattedUrl(originalUrl, md5) {
-  let parsedUrl = url.parse(originalUrl)
 
+function revedUrl(originalUrl, md5) {
+  let parsedUrl = url.parse(originalUrl)
   const {dir, name, ext} = parse(parsedUrl.pathname)
-  parsedUrl.pathname = `/assets/${removeFirstDir(dir)}/${name}-${md5}${ext}`
+  parsedUrl.pathname = `/dist${dir}/${name}-${md5}${ext}`
   return url.format(parsedUrl)
 }
 
@@ -64,7 +59,7 @@ export default async function compileSingleBundle ({bundleName, variant, brandId
       cache.file_checksums.update(relativePath, md5)
     }
     urlsFoundInCss.add(pathToFile)
-    return sprocketsFormattedUrl(originalUrl, md5)
+    return revedUrl(originalUrl, md5)
   }
 
   const startTime = new Date()
