@@ -117,6 +117,7 @@ export async function checkAll({brandId}){
 function processChangedBundles(changedBundles) {
   return Promise.all(_.map(changedBundles, async function(variants, bundleName) {
     let allOutputWillBeSame, sharedResult
+
     async function copyOrCompile({variant, brandId, unbrandedCombinedChecksum}) {
       if (allOutputWillBeSame) {
         debug('just copying', bundleName, variant, brandId)
@@ -137,6 +138,7 @@ function processChangedBundles(changedBundles) {
       }
       return result
     }
+
     await* Object.keys(variants).map(async function (variant) {
       let unbrandedCombinedChecksum = sharedResult && sharedResult.combinedChecksum
       let compileSelf = variants[variant].compileSelf
@@ -244,13 +246,14 @@ async function onFilesystemChange(eventType, filePath, details){
 function whatToCompileIfFileChanges (filename) {
   let toCompile = {}
   if (!isSassPartial(filename)) {
+    const bundleName = filename
     for (const variant of VARIANTS) {
-      // TODO: this is a bug, bundleName is undefined
       _.set(toCompile, [bundleName, variant, 'compileSelf'], true)
-    }
-    if (BRANDABLE_VARIANTS.has(variant)) {
-      for (const brandId of brandConfigs) {
-        _.set(toCompile, [bundleName, variant, brandId], true)
+      if (BRANDABLE_VARIANTS.has(variant)) {
+        for (const brandId of getBrandIds()) {
+          console.log(bundleName, variant, brandId)
+          _.set(toCompile, [bundleName, variant, brandId], true)
+        }
       }
     }
   } else {
