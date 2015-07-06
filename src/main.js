@@ -187,7 +187,11 @@ async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedCh
 function cssFilename({bundleName, variant, brandId, combinedChecksum}) {
   const {dir, name} = parse(bundleName)
   const outputDir = path.join(PATHS.output_dir, brandId || '', variant, dir)
-  return path.join(outputDir, `${name}-${combinedChecksum}.css`)
+  if (combinedChecksum) {
+    return path.join(outputDir, `${name}-${combinedChecksum}.css`)
+  } else {
+    return path.join(outputDir, `${name}.css`)
+  }
 }
 
 async function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles, gzipped}) {
@@ -195,8 +199,10 @@ async function writeCss ({css, variant, bundleName, brandId, combinedChecksum, i
   if (brandId) cacheKey.push(brandId)
   cache.bundles_with_deps.update(joined(...cacheKey), {combinedChecksum, includedFiles})
   const filename = cssFilename({bundleName, variant, brandId, combinedChecksum})
+  const filename_without_checksum = cssFilename({bundleName, variant, brandId})
   return await* [
     outputFile(filename, css),
+    outputFile(filename_without_checksum, css),
     outputFile(filename + '.gz', gzipped)
   ]
 }
