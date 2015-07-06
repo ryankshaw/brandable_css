@@ -18,9 +18,7 @@ import cache from './cache'
 import writeDefaultBrandableVariablesScss from './write-brandable-variables-defaults-scss'
 import parse from './parse'
 
-function joined() {
-  return [].join.call(arguments, manifest_key_seperator)
-}
+
 
 function getBrandIds() {
   try {
@@ -28,6 +26,26 @@ function getBrandIds() {
   } catch(e) {
     return []
   }
+}
+
+function cacheKey(bundleName, variant, brandId) {
+  const key = [bundleName, variant]
+  if (brandId) key.push(brandId)
+  return key.join(manifest_key_seperator)
+}
+
+function cacheFor(bundleName, variant, /*optional*/ brandId) {
+  const cached = cache.bundles_with_deps.data[cacheKey(...arguments)]
+  if (!cached) return
+
+  const filenames = cssFilenames({
+    bundleName,
+    variant,
+    brandId,
+    combinedChecksum: cached.combinedChecksum
+  })
+
+  if (_.every(filenames, fs.existsSync)) return cached
 }
 
 // This looks really crazy but it is the fastest way to find all the bundles
@@ -51,9 +69,9 @@ async function findChangedBundles(bundles, onlyCheckThisBrandId) {
 
   for (let bundleName of bundles) {
     for (let variant of variants){
-      const cached = cache.bundles_with_deps.data[joined(bundleName, variant)]
       let thisVariantHasChanged = false
-      if (!cached || !fs.existsSync(cssFilename({bundleName, variant, combinedChecksum: cached.combinedChecksum}))) {
+      const cached = cacheFor(bundleName, variant)
+      if (!cached) {
         thisVariantHasChanged = true
         changedFiles.add(bundleName)
       } else {
@@ -70,17 +88,10 @@ async function findChangedBundles(bundles, onlyCheckThisBrandId) {
       if (BRANDABLE_VARIANTS.has(variant)) {
         for (const brandId of brandIds) {
           const brandVarFile = relativeSassPath(path.join(folderForBrandId(brandId), '_brand_variables.scss'))
-          let compileThisBrand = fasterHasFileChanged(brandVarFile) || thisVariantHasChanged
-          if (!compileThisBrand) {
-            const cachedBrand = cache.bundles_with_deps.data[joined(bundleName, variant, brandId)]
-            compileThisBrand = !cachedBrand || !fs.existsSync(cssFilename({
-              bundleName,
-              variant,
-              brandId,
-              combinedChecksum: cachedBrand.combinedChecksum
-            }))
-          }
-          if (compileThisBrand) {
+          if (fasterHasFileChanged(brandVarFile) ||
+              thisVariantHasChanged ||
+              !cacheFor(bundleName, variant, brandId)
+          ) {
             _.set(toCompile, [bundleName, variant, brandId], true)
           }
         }
@@ -94,11 +105,6 @@ export async function checkAll({brandId}){
   debug('checking all sass bundles to see if they need updating')
   await writeDefaultBrandableVariablesScss()
   const bundles = await glob(PATHS.all_sass_bundles).map(relativeSassPath)
-
-  // remove any artifacts of bundles that are no longer on disk
-  // TODO DO we really need this?
-  // _(cache.bundles_with_deps).map(_.keys).flatten().uniq().without(...bundles).forEach(onBundleDeleted).value()
-
   const changedBundles = await findChangedBundles(bundles, brandId)
   if (_.isEmpty(changedBundles)) {
     console.info(chalk.green('no sass changes detected'))
@@ -184,21 +190,22 @@ async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedCh
   return finalResult
 }
 
-function cssFilename({bundleName, variant, brandId, combinedChecksum}) {
+function cssFilenames({bundleName, variant, brandId, combinedChecksum}) {
   const {dir, name} = parse(bundleName)
   const outputDir = path.join(PATHS.output_dir, brandId || '', variant, dir)
-  return path.join(outputDir, `${name}-${combinedChecksum}.css`)
+  return {
+    fingerprinted:   path.join(outputDir, `${name}-${combinedChecksum}.css`),
+    unfingerprinted: path.join(outputDir, `${name}.css`)
+  }
 }
 
-async function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles, gzipped}) {
-  const cacheKey = [bundleName, variant]
-  if (brandId) cacheKey.push(brandId)
-  cache.bundles_with_deps.update(joined(...cacheKey), {combinedChecksum, includedFiles})
-  const filename = cssFilename({bundleName, variant, brandId, combinedChecksum})
-  return await* [
+function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles, gzipped}) {
+  cache.bundles_with_deps.update(cacheKey(bundleName, variant), {combinedChecksum, includedFiles})
+  const filenames = cssFilenames({bundleName, variant, brandId, combinedChecksum})
+  return Promise.all(_.flatten(_.map(filenames, (filename) => [
     outputFile(filename, css),
     outputFile(filename + '.gz', gzipped)
-  ]
+  ])))
 }
 
 function onBundleDeleted(bundleName) {
@@ -238,6 +245,7 @@ function whatToCompileIfFileChanges (filename) {
   let toCompile = {}
   if (!isSassPartial(filename)) {
     for (const variant of VARIANTS) {
+      // TODO: this is a bug, bundleName is undefined
       _.set(toCompile, [bundleName, variant, 'compileSelf'], true)
     }
     if (BRANDABLE_VARIANTS.has(variant)) {
