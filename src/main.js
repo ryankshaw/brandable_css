@@ -43,7 +43,7 @@ function cacheFor(bundleName, variant, /*optional*/ brandId) {
     brandId,
     combinedChecksum: cached.combinedChecksum
   })
-  if (fs.existsSync)) return cached
+  if (fs.existsSync(filename)) return cached
 }
 
 // This is a fast way to find all the bundles that need to be rebuilt on startup
