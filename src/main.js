@@ -19,7 +19,6 @@ import writeDefaultBrandableVariablesScss from './write-brandable-variables-defa
 import parse from './parse'
 
 
-
 function getBrandIds() {
   try {
     return fs.readdirSync(PATHS.branded_scss_folder)
@@ -38,18 +37,16 @@ function cacheFor(bundleName, variant, /*optional*/ brandId) {
   const cached = cache.bundles_with_deps.data[cacheKey(...arguments)]
   if (!cached) return
 
-  const filenames = cssFilenames({
+  const filename = cssFilename({
     bundleName,
     variant,
     brandId,
     combinedChecksum: cached.combinedChecksum
   })
-
-  if (_.every(filenames, fs.existsSync)) return cached
+  if (fs.existsSync)) return cached
 }
 
-// This looks really crazy but it is the fastest way to find all the bundles
-// that need to be rebuilt on startup
+// This is a fast way to find all the bundles that need to be rebuilt on startup
 async function findChangedBundles(bundles, onlyCheckThisBrandId) {
   const changedFiles = new Set()
   const unchangedFiles = new Set()
@@ -192,22 +189,19 @@ async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedCh
   return finalResult
 }
 
-function cssFilenames({bundleName, variant, brandId, combinedChecksum}) {
+function cssFilename({bundleName, variant, brandId, combinedChecksum}) {
   const {dir, name} = parse(bundleName)
   const outputDir = path.join(PATHS.output_dir, brandId || '', variant, dir)
-  return {
-    fingerprinted:   path.join(outputDir, `${name}-${combinedChecksum}.css`),
-    unfingerprinted: path.join(outputDir, `${name}.css`)
-  }
+  return path.join(outputDir, `${name}-${combinedChecksum}.css`)
 }
 
-function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles, gzipped}) {
+async function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles, gzipped}) {
   cache.bundles_with_deps.update(cacheKey(bundleName, variant), {combinedChecksum, includedFiles})
-  const filenames = cssFilenames({bundleName, variant, brandId, combinedChecksum})
-  return Promise.all(_.flatten(_.map(filenames, (filename) => [
+  const filename = cssFilename({bundleName, variant, brandId, combinedChecksum})
+  return await* [
     outputFile(filename, css),
     outputFile(filename + '.gz', gzipped)
-  ])))
+  ]
 }
 
 function onBundleDeleted(bundleName) {
