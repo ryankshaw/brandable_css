@@ -18,6 +18,9 @@
     "bin",
     "lib"
   ],
+  "engines" : {
+    "node": ">=0.12.5"
+  },
   "dependencies": {
     "autoprefixer": "^5.2.0",
     "babel": "^5.4.7",
