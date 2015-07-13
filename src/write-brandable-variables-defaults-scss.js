@@ -11,7 +11,7 @@ export default async function writeDefaultBrandableVariablesScss(){
     variableGroup.variables.forEach(variable => {
       let value = variable.default
       if (variable.type === 'image') value = 'url("'+value+'")'
-      fileContents += '\n$'+variable.variable_name+': '+value+';'
+      fileContents += '\n$'+variable.variable_name+': '+value+'  !default;'
     })
   })
   return await writeFile(PATHS.brandable_variables_defaults_scss, fileContents)
