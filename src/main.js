@@ -2,8 +2,6 @@ import Promise from 'bluebird'
 import fs from 'fs-extra'
 const outputFile = Promise.promisify(fs.outputFile)
 const glob = Promise.promisify(require('glob'))
-import zlib from 'zlib'
-const gzip = Promise.promisify(zlib.gzip)
 import path from 'path'
 import _ from 'lodash'
 import chalk from 'chalk'
@@ -122,7 +120,6 @@ function processChangedBundles(changedBundles) {
           css: sharedResult.css,
           combinedChecksum: unbrandedCombinedChecksum || sharedResult.combinedChecksum,
           includedFiles: sharedResult.includedFiles,
-          gzipped: sharedResult.gzipped,
           variant,
           bundleName,
           brandId
@@ -171,15 +168,9 @@ async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedCh
   const combinedChecksum = brandId ? unbrandedCombinedChecksum : checksum(result.css + md5s)
 
   const buffered = new Buffer(result.css)
-  // node 0.10 doesn't allow passing an options object
-  const gzipped = await ( /^v0\.10/.test(process.version) ?
-    gzip(buffered) :
-    gzip(buffered, {level : zlib.Z_BEST_COMPRESSION})
-  )
   const finalResult = {
     css: result.css,
     combinedChecksum,
-    gzipped,
     variant,
     bundleName,
     brandId,
@@ -195,13 +186,10 @@ function cssFilename({bundleName, variant, brandId, combinedChecksum}) {
   return path.join(outputDir, `${name}-${combinedChecksum}.css`)
 }
 
-async function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles, gzipped}) {
+function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles}) {
   cache.bundles_with_deps.update(cacheKey(bundleName, variant), {combinedChecksum, includedFiles})
   const filename = cssFilename({bundleName, variant, brandId, combinedChecksum})
-  return await* [
-    outputFile(filename, css),
-    outputFile(filename + '.gz', gzipped)
-  ]
+  return outputFile(filename, css)
 }
 
 function onBundleDeleted(bundleName) {
