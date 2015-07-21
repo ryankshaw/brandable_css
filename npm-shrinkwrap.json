@@ -1,6 +1,6 @@
 {
   "name": "brandable_css",
-  "version": "0.0.35",
+  "version": "0.0.36",
   "dependencies": {
     "autoprefixer": {
       "version": "5.2.0",
