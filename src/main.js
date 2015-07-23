@@ -143,7 +143,10 @@ function processChangedBundles(changedBundles) {
       // so if we dont have one to use by now, we have to compileSelf anyway so we can use it.
       if (brandIds.length && !unbrandedCombinedChecksum) compileSelf = true
       if (compileSelf) unbrandedCombinedChecksum = (await copyOrCompile({variant})).combinedChecksum
-      return await* brandIds.map(brandId => copyOrCompile({variant, brandId, unbrandedCombinedChecksum}))
+      for (let i = 0; i < brandIds.length; i++) {
+        let brandId = brandIds[i]
+        await copyOrCompile({variant, brandId, unbrandedCombinedChecksum})
+      }
     })
   })).then(cache.saveAll)
 }
