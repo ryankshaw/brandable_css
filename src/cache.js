@@ -1,4 +1,4 @@
-const debug = require('debug')('canvas_css')
+const debug = require('debug')('brandable_css')
 import _ from 'lodash'
 import {readJsonSync} from './utils'
 import {paths as PATHS} from './config'

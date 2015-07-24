@@ -20,7 +20,7 @@ export function folderForBrandId(brandId) {
 }
 
 export function relativeSassPath (absPath) {
-  return path.relative(path.join(process.env.PWD, PATHS.sass_dir), absPath)
+  return path.relative(path.join(process.cwd(), PATHS.sass_dir), absPath)
 }
 
 export function isSassPartial (filePath) {
