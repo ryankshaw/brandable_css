@@ -26,7 +26,7 @@ function revedUrl(originalUrl, md5) {
 }
 
 function warn() {
-  console.error(chalk.yellow('canvas_css warning', ...arguments))
+  console.error(chalk.yellow('brandable_css warning', ...arguments))
 }
 
 export default async function compileSingleBundle ({bundleName, variant, brandId}) {
