@@ -1,7 +1,6 @@
 import revHash from 'rev-hash'
 import fs from 'fs'
 import path from 'path'
-import versions from './versions'
 import {paths as PATHS} from './config'
 
 export function checksum (data) {
