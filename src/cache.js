@@ -31,7 +31,7 @@ function initCache(name) {
       debug('saving', self.isSaved, filename)
       if (self.isSaved) return
       self.isSaved = true
-      return outputJson(filename, self.data)
+      return outputJson(filename, self.data, {spaces: 2})
     },
 
     clearMatching(query) {
