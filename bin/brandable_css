@@ -2,7 +2,8 @@
 
 // without this, node only uses 4 of the available cores on my MacBookPro
 // see: http://www.future-processing.pl/blog/on-problems-with-threads-in-node-js/
-process.env.UV_THREADPOOL_SIZE = 8
+process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE ||
+                                 Math.max(require('os').cpus().length, 4)
 
 require("babel/polyfill")
 require('../lib/cli')
