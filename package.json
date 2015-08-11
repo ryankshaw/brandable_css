@@ -3,7 +3,7 @@
   "version": "0.0.39",
   "description": "This is what we use to compile sass in canvas-lms with all our variants and custom theme editor css",
   "scripts": {
-    "build": "./node_modules/.bin/babel src --stage 0 --out-dir lib",
+    "build": "./node_modules/.bin/standard --verbose && ./node_modules/.bin/babel src --stage 0 --out-dir lib",
     "dev": "npm run build -- --watch",
     "prepublish": "npm run build",
     "release": "npm shrinkwrap && npm version patch && git push && npm publish",
@@ -21,6 +21,9 @@
   "engines": {
     "node": ">=0.12.5"
   },
+  "standard": {
+    "parser": "babel-eslint"
+  },
   "dependencies": {
     "autoprefixer": "^5.2.0",
     "babel": "^5.4.7",
@@ -37,5 +40,9 @@
     "postcss": "^4.1.10",
     "postcss-url": "^4.0.0",
     "rev-hash": "^1.0.0"
+  },
+  "devDependencies": {
+    "babel-eslint": "^4.0.5",
+    "standard": "^5.0.2"
   }
 }

@@ -14,10 +14,8 @@ import {manifest_key_seperator, paths as PATHS} from './config'
 import VARIANTS, {BRANDABLE_VARIANTS} from './variants'
 import cache from './cache'
 import writeDefaultBrandableVariablesScss from './write-brandable-variables-defaults-scss'
-import parse from './parse'
 
-
-function getBrandIds() {
+function getBrandIds () {
   try {
     return fs.readdirSync(PATHS.branded_scss_folder)
   } catch(e) {
@@ -25,13 +23,13 @@ function getBrandIds() {
   }
 }
 
-function cacheKey(bundleName, variant, brandId) {
+function cacheKey (bundleName, variant, brandId) {
   const key = [bundleName, variant]
   if (brandId) key.push(brandId)
   return key.join(manifest_key_seperator)
 }
 
-function cacheFor(bundleName, variant, /*optional*/ brandId) {
+function cacheFor (bundleName, variant, /* optional */ brandId) {
   const cached = cache.bundles_with_deps.data[cacheKey(...arguments)]
   if (!cached) return
 
@@ -45,7 +43,7 @@ function cacheFor(bundleName, variant, /*optional*/ brandId) {
 }
 
 // This is a fast way to find all the bundles that need to be rebuilt on startup
-async function findChangedBundles(bundles, onlyCheckThisBrandId) {
+async function findChangedBundles (bundles, onlyCheckThisBrandId) {
   const changedFiles = new Set()
   const unchangedFiles = new Set()
   const toCompile = {}
@@ -63,7 +61,7 @@ async function findChangedBundles(bundles, onlyCheckThisBrandId) {
   }
 
   for (let bundleName of bundles) {
-    for (let variant of variants){
+    for (let variant of variants) {
       let thisVariantHasChanged = false
       const cached = cacheFor(bundleName, variant)
       if (!cached) {
@@ -96,7 +94,7 @@ async function findChangedBundles(bundles, onlyCheckThisBrandId) {
   return toCompile
 }
 
-export async function checkAll({brandId}){
+export async function checkAll ({brandId}) {
   debug('checking all sass bundles to see if they need updating')
   await writeDefaultBrandableVariablesScss()
   const bundles = await glob(PATHS.all_sass_bundles).map(relativeSassPath)
@@ -109,11 +107,11 @@ export async function checkAll({brandId}){
   return await processChangedBundles(changedBundles)
 }
 
-function processChangedBundles(changedBundles) {
+function processChangedBundles (changedBundles) {
   return Promise.all(_.map(changedBundles, async function(variants, bundleName) {
     let allOutputWillBeSame, sharedResult
 
-    async function copyOrCompile({variant, brandId, unbrandedCombinedChecksum}) {
+    async function copyOrCompile ({variant, brandId, unbrandedCombinedChecksum}) {
       if (allOutputWillBeSame) {
         debug('just copying', bundleName, variant, brandId)
         return writeCss({
@@ -136,7 +134,7 @@ function processChangedBundles(changedBundles) {
     await* Object.keys(variants).map(async function (variant) {
       let unbrandedCombinedChecksum = sharedResult && sharedResult.combinedChecksum
       let compileSelf = variants[variant].compileSelf
-      const brandIds = Object.keys(variants[variant]).filter(k => k != 'compileSelf')
+      const brandIds = Object.keys(variants[variant]).filter(k => k !== 'compileSelf')
 
       // The 'combinedChecksum' for the branded versions needs to be the same as the stock, unbranded result.
       // That is the only way we can load css dynamically in handlebars/js files.
@@ -159,7 +157,7 @@ function getChecksum (relativePath) {
   }
 }
 
-async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedChecksum}){
+async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedChecksum}) {
   if (brandId && !unbrandedCombinedChecksum) throw new Error('must provide unbrandedCombinedChecksum if compiling a branded bundle')
   const result = await compileSingleBundle({bundleName, variant, brandId})
   const includedFiles = result.includedFiles.map(relativeSassPath)
@@ -170,21 +168,20 @@ async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedCh
   const md5s = includedFiles.map(getChecksum)
   const combinedChecksum = brandId ? unbrandedCombinedChecksum : checksum(result.css + md5s)
 
-  const buffered = new Buffer(result.css)
   const finalResult = {
     css: result.css,
     combinedChecksum,
     variant,
     bundleName,
     brandId,
-    includedFiles,
+    includedFiles
   }
   await writeCss(finalResult)
   return finalResult
 }
 
-function cssFilename({bundleName, variant, brandId, combinedChecksum}) {
-  const {dir, name} = parse(bundleName)
+function cssFilename ({bundleName, variant, brandId, combinedChecksum}) {
+  const {dir, name} = path.posix.parse(bundleName)
   const outputDir = path.join(PATHS.output_dir, brandId || '', variant, dir)
   return path.join(outputDir, `${name}-${combinedChecksum}.css`)
 }
@@ -195,27 +192,26 @@ function writeCss ({css, variant, bundleName, brandId, combinedChecksum, include
   return outputFile(filename, css)
 }
 
-function onBundleDeleted(bundleName) {
+function onBundleDeleted (bundleName) {
   cache.bundles_with_deps.clearMatching(bundleName)
   cache.file_checksums.update(bundleName, undefined)
 }
 
-async function onFilesystemChange(eventType, filePath, details){
+async function onFilesystemChange (eventType, filePath, details) {
   try {
     debug('onFilesystemChange', eventType, filePath, details.type)
-    if (details.type != 'file' || details.event === 'unknown') return
+    if (details.type !== 'file' || details.event === 'unknown') return
 
-    if (filePath.match(PATHS.brandable_variables_json)){
+    if (filePath.match(PATHS.brandable_variables_json)) {
       debug(PATHS.brandable_variables_json, 'changed, saving to scss')
-      return await writeDefaultBrandableVariablesScssFile()
+      return await writeDefaultBrandableVariablesScss()
     }
     filePath = relativeSassPath(filePath)
 
     if (eventType === 'deleted') {
       cache.file_checksums.update(filePath, undefined)
       if (!isSassPartial(filePath)) onBundleDeleted(filePath)
-      debug('unwatching', filePath)
-      watcher.unwatch(filePath)
+      unwatch(filePath)
       return
     }
     if (hasFileChanged(filePath)) {
@@ -256,7 +252,7 @@ function whatToCompileIfFileChanges (filename) {
   return toCompile
 }
 
-function hasFileChanged(relativePath) {
+function hasFileChanged (relativePath) {
   const cached = cache.file_checksums.data[relativePath]
   const current = relativeFileChecksum(relativePath)
   cache.file_checksums.update(relativePath, current)
@@ -265,17 +261,17 @@ function hasFileChanged(relativePath) {
 
 var watcher
 const watched = new Set()
-function watch(filename) {
+function watch (filename) {
   if (!watcher || watched.has(filename)) return
   watched.add(filename)
   watcher.add(filename)
 }
-function unwatch(filename) {
+function unwatch (filename) {
   if (!watcher || !watched.delete(filename)) return
   debug('unwatching', filename)
   watcher.unwatch(filename)
 }
-export function startWatcher() {
+export function startWatcher () {
   debug('watching for changes to any scss files')
   watcher = chokidar
     .watch(PATHS.brandable_variables_json, {persistent: true, cwd: PATHS.sass_dir})

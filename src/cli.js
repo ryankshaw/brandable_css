@@ -1,6 +1,6 @@
 import program from 'commander'
-import {checkAll, startWatcher} from './main'
-import {onError} from './utils'
+import { checkAll, startWatcher } from './main'
+import { onError } from './utils'
 
 program
   .version(require('../package').version)

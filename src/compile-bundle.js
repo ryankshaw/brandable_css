@@ -2,30 +2,28 @@ import Promise from 'bluebird'
 const existsAsync = Promise.promisify(require('fs').stat)
 const sassRender = Promise.promisify(require('node-sass').render)
 import path from 'path'
-import _ from 'lodash'
 import chalk from 'chalk'
 import url from 'url'
 import postcss from 'postcss'
 import autoprefixer from 'autoprefixer'
 import postcssUrl from 'postcss-url'
-import {paths as PATHS} from "./config"
+import {paths as PATHS} from './config'
 import {BRANDABLE_VARIANTS} from './variants'
 import SASS_STYLE from './sass_style'
 import {fileChecksumSync} from './checksum'
 import supportedBrowsers from './browser-support'
 import cache from './cache'
 import parse from './parse'
-import {debug, relativeSassPath, folderForBrandId} from './utils'
+import {relativeSassPath, folderForBrandId} from './utils'
 
-
-function revedUrl(originalUrl, md5) {
+function revedUrl (originalUrl, md5) {
   let parsedUrl = url.parse(originalUrl)
   const {dir, name, ext} = parse(parsedUrl.pathname)
   parsedUrl.pathname = `/dist${dir}/${name}-${md5}${ext}`
   return url.format(parsedUrl)
 }
 
-function warn() {
+function warn () {
   console.error(chalk.yellow('brandable_css warning', ...arguments))
 }
 
@@ -41,7 +39,7 @@ export default async function compileSingleBundle ({bundleName, variant, brandId
   }
 
   let urlsFoundInCss = new Set()
-  function putMD5sInUrls(originalUrl) {
+  function putMD5sInUrls (originalUrl) {
     const parsedUrl = url.parse(originalUrl)
     if (parsedUrl.host || parsedUrl.href.indexOf('//') === 0 || !parsedUrl.path) {
       warn(sassFile, 'has an external url() to:', originalUrl, 'that\'s not a problem but normally our css only links to files in our repo')

@@ -1,11 +1,9 @@
 export const debug = require('debug')('brandable_css')
 import path from 'path'
-import Promise from 'bluebird'
 import fs from 'fs-extra'
-import {paths as PATHS} from "./config"
+import { paths as PATHS } from './config'
 
-
-export function readJsonSync(filename) {
+export function readJsonSync (filename) {
   debug('reading', filename)
   try {
     return fs.readJsonSync(filename)
@@ -15,7 +13,7 @@ export function readJsonSync(filename) {
   }
 }
 
-export function folderForBrandId(brandId) {
+export function folderForBrandId (brandId) {
   return path.join(PATHS.branded_scss_folder, brandId)
 }
 
@@ -27,7 +25,7 @@ export function isSassPartial (filePath) {
   return path.basename(filePath)[0] === '_'
 }
 
-export function onError (err){
+export function onError (err) {
   console.error('error compiling sass', err, err.stack, err.message)
   process.exit(1)
 }
