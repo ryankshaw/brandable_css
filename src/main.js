@@ -136,14 +136,9 @@ async function processChangedBundles (changedBundles) {
       if (includesNoVariables) return
       const result = await compileBundle({variant, bundleName, brandId, unbrandedCombinedChecksum})
       if (typeof includesNoVariables === 'undefined') {
-        includesNoVariables = !_.includes(result.includedFiles, relativeSassPath(PATHS.brandable_variables_defaults_scss))
+        includesNoVariables = result.includesNoVariables
         if (includesNoVariables) {
-          let dataToCache = {
-            combinedChecksum: result.combinedChecksum,
-            includedFiles: result.includedFiles,
-            includesNoVariables: true
-          }
-          VARIANTS.map(variant => cache.bundles_with_deps.update(cacheKey(bundleName, variant), dataToCache))
+          VARIANTS.map(variant => updateCache(_.defaults({variant}, result)))
         }
       }
       return result
@@ -202,7 +197,8 @@ const compileBundle = limitConcurrency(60, async function ({variant, bundleName,
     variant,
     bundleName,
     brandId,
-    includedFiles
+    includedFiles,
+    includesNoVariables: !_.includes(includedFiles, relativeSassPath(PATHS.brandable_variables_defaults_scss))
   }
   await writeCss(finalResult)
   return finalResult
@@ -218,9 +214,15 @@ function cdnObjectName (cssFilename) {
   return cssFilename.replace(PATHS.public_dir + '/', '')
 }
 
-function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles, includesNoVariables}) {
+function updateCache ({variant, bundleName, combinedChecksum, includedFiles, includesNoVariables}) {
   cache.bundles_with_deps.update(cacheKey(bundleName, variant), {combinedChecksum, includedFiles, includesNoVariables})
+}
+
+function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles, includesNoVariables}) {
+  updateCache({bundleName, variant, combinedChecksum, includedFiles, includesNoVariables})
   const filename = cssFilename({bundleName, variant, brandId, combinedChecksum, includesNoVariables})
+  // this option is for deployers so they can create the 2 manifest files but not write any css files to the tarball.
+  if (process.env.ONLY_GENERATE_MANIFESTS) return
   return s3Bucket ? s3Bucket.uploadCSS(cdnObjectName(filename), css) : outputFile(filename, css)
 }
 
