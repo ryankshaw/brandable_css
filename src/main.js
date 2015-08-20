@@ -8,12 +8,21 @@ import chalk from 'chalk'
 import chokidar from 'chokidar'
 
 import {checksum, relativeFileChecksum} from './checksum'
-import compileSingleBundle from './compile-bundle'
+import compileSingleBundle from './compileBundle'
 import {debug, relativeSassPath, isSassPartial, folderForBrandId, onError} from './utils'
 import {manifest_key_seperator, paths as PATHS} from './config'
 import VARIANTS, {BRANDABLE_VARIANTS} from './variants'
 import cache from './cache'
-import writeDefaultBrandableVariablesScss from './write-brandable-variables-defaults-scss'
+import limitConcurrency from './limitConcurrency'
+import writeDefaultBrandableVariablesScss from './writeDefaultBrandableVariablesScss'
+import s3Bucket from './s3Bucket'
+
+// a promise version of fs.exists
+function fsExists (path) {
+  return new Promise(function (resolve) {
+    fs.exists(path, resolve)
+  })
+}
 
 function getBrandIds () {
   try {
@@ -23,23 +32,27 @@ function getBrandIds () {
   }
 }
 
-function cacheKey (bundleName, variant, brandId) {
-  const key = [bundleName, variant]
-  if (brandId) key.push(brandId)
-  return key.join(manifest_key_seperator)
+function cacheKey (bundleName, variant) {
+  return [bundleName, variant].join(manifest_key_seperator)
 }
 
-function cacheFor (bundleName, variant, /* optional */ brandId) {
-  const cached = cache.bundles_with_deps.data[cacheKey(...arguments)]
+async function cacheFor (bundleName, variant, /* optional */ brandId) {
+  const cached = cache.bundles_with_deps.data[cacheKey(bundleName, variant)]
   if (!cached) return
 
   const filename = cssFilename({
     bundleName,
     variant,
     brandId,
-    combinedChecksum: cached.combinedChecksum
+    combinedChecksum: cached.combinedChecksum,
+    includesNoVariables: cached.includesNoVariables
   })
-  if (fs.existsSync(filename)) return cached
+
+  const cssFileExists = await (s3Bucket ?
+    s3Bucket.objectExists(cdnObjectName(filename)) :
+    fsExists(filename)
+  )
+  if (cssFileExists) return cached
 }
 
 // This is a fast way to find all the bundles that need to be rebuilt on startup
@@ -51,7 +64,7 @@ async function findChangedBundles (bundles, onlyCheckThisBrandId) {
   const variants = onlyCheckThisBrandId ? BRANDABLE_VARIANTS : VARIANTS
 
   function fasterHasFileChanged (filename) {
-    debug('checking', filename)
+    // debug('fasterHasFileChanged', filename)
     if (unchangedFiles.has(filename)) return false
     if (changedFiles.has(filename)) return true
     const iHaveChanged = hasFileChanged(filename)
@@ -60,10 +73,13 @@ async function findChangedBundles (bundles, onlyCheckThisBrandId) {
     return iHaveChanged
   }
 
-  for (let bundleName of bundles) {
-    for (let variant of variants) {
+  await* bundles.map(async function (bundleName) {
+    let includesNoVariables
+    await* variants.map(async function (variant) {
+      if (includesNoVariables) return
       let thisVariantHasChanged = false
-      const cached = cacheFor(bundleName, variant)
+      const cached = await cacheFor(bundleName, variant)
+      debug('cached was', cached)
       if (!cached) {
         thisVariantHasChanged = true
         changedFiles.add(bundleName)
@@ -75,7 +91,12 @@ async function findChangedBundles (bundles, onlyCheckThisBrandId) {
           }
         }
       }
-      if (thisVariantHasChanged && !onlyCheckThisBrandId) {
+      if (!thisVariantHasChanged && cached.includesNoVariables) {
+        // then we don't need to even check other variants or branded versions of this bundle
+        includesNoVariables = true
+        return
+      }
+      if (thisVariantHasChanged) {
         _.set(toCompile, [bundleName, variant, 'compileSelf'], true)
       }
       if (BRANDABLE_VARIANTS.has(variant)) {
@@ -83,14 +104,14 @@ async function findChangedBundles (bundles, onlyCheckThisBrandId) {
           const brandVarFile = relativeSassPath(path.join(folderForBrandId(brandId), '_brand_variables.scss'))
           if (fasterHasFileChanged(brandVarFile) ||
               thisVariantHasChanged ||
-              !cacheFor(bundleName, variant, brandId)
+              !(await cacheFor(bundleName, variant, brandId))
           ) {
             _.set(toCompile, [bundleName, variant, brandId], true)
           }
         }
       }
-    }
-  }
+    })
+  })
   return toCompile
 }
 
@@ -107,46 +128,50 @@ export async function checkAll ({brandId}) {
   return await processChangedBundles(changedBundles)
 }
 
-function processChangedBundles (changedBundles) {
-  return Promise.all(_.map(changedBundles, async function(variants, bundleName) {
-    let allOutputWillBeSame, sharedResult
+async function processChangedBundles (changedBundles) {
+  await* _.map(changedBundles, async function(variants, bundleName) {
+    let includesNoVariables
 
-    async function copyOrCompile ({variant, brandId, unbrandedCombinedChecksum}) {
-      if (allOutputWillBeSame) {
-        debug('just copying', bundleName, variant, brandId)
-        return writeCss({
-          css: sharedResult.css,
-          combinedChecksum: unbrandedCombinedChecksum || sharedResult.combinedChecksum,
-          includedFiles: sharedResult.includedFiles,
-          variant,
-          bundleName,
-          brandId
-        })
-      }
+    async function compileUnlessIncludesNoVariables ({variant, brandId, unbrandedCombinedChecksum}) {
+      if (includesNoVariables) return
       const result = await compileBundle({variant, bundleName, brandId, unbrandedCombinedChecksum})
-      if (typeof allOutputWillBeSame === 'undefined') {
-        allOutputWillBeSame = !_.includes(result.includedFiles, relativeSassPath(PATHS.brandable_variables_defaults_scss))
-        if (allOutputWillBeSame) sharedResult = result
+      if (typeof includesNoVariables === 'undefined') {
+        includesNoVariables = !_.includes(result.includedFiles, relativeSassPath(PATHS.brandable_variables_defaults_scss))
+        if (includesNoVariables) {
+          let dataToCache = {
+            combinedChecksum: result.combinedChecksum,
+            includedFiles: result.includedFiles,
+            includesNoVariables: true
+          }
+          VARIANTS.map(variant => cache.bundles_with_deps.update(cacheKey(bundleName, variant), dataToCache))
+        }
       }
       return result
     }
 
     await* Object.keys(variants).map(async function (variant) {
-      let unbrandedCombinedChecksum = sharedResult && sharedResult.combinedChecksum
+      if (includesNoVariables) return
+      let unbrandedCombinedChecksum
       let compileSelf = variants[variant].compileSelf
       const brandIds = Object.keys(variants[variant]).filter(k => k !== 'compileSelf')
 
       // The 'combinedChecksum' for the branded versions needs to be the same as the stock, unbranded result.
       // That is the only way we can load css dynamically in handlebars/js files.
       // so if we dont have one to use by now, we have to compileSelf anyway so we can use it.
-      if (brandIds.length && !unbrandedCombinedChecksum) compileSelf = true
-      if (compileSelf) unbrandedCombinedChecksum = (await copyOrCompile({variant})).combinedChecksum
-      for (let i = 0; i < brandIds.length; i++) {
-        let brandId = brandIds[i]
-        await copyOrCompile({variant, brandId, unbrandedCombinedChecksum})
+      if (!compileSelf && brandIds.length && !unbrandedCombinedChecksum) {
+        let cached = cache.bundles_with_deps.data[cacheKey(bundleName, variant)]
+        if (cached) {
+          unbrandedCombinedChecksum = cached.combinedChecksum
+        } else {
+          compileSelf = true
+        }
       }
+
+      if (compileSelf) unbrandedCombinedChecksum = (await compileUnlessIncludesNoVariables({variant})).combinedChecksum
+      await* brandIds.map(brandId => compileUnlessIncludesNoVariables({variant, brandId, unbrandedCombinedChecksum}))
     })
-  })).then(cache.saveAll)
+  })
+  cache.saveAll()
 }
 
 function getChecksum (relativePath) {
@@ -157,7 +182,10 @@ function getChecksum (relativePath) {
   }
 }
 
-async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedChecksum}) {
+// We don't want to just fire off all the work at the same time because we're CPU contstrained anyway
+// and it will just cause it to consume a ton of memory, so just do 60 at a time. that'll be plenty
+// to keep the CPU busy.
+const compileBundle = limitConcurrency(60, async function ({variant, bundleName, brandId, unbrandedCombinedChecksum}) {
   if (brandId && !unbrandedCombinedChecksum) throw new Error('must provide unbrandedCombinedChecksum if compiling a branded bundle')
   const result = await compileSingleBundle({bundleName, variant, brandId})
   const includedFiles = result.includedFiles.map(relativeSassPath)
@@ -178,18 +206,22 @@ async function compileBundle ({variant, bundleName, brandId, unbrandedCombinedCh
   }
   await writeCss(finalResult)
   return finalResult
-}
+})
 
-function cssFilename ({bundleName, variant, brandId, combinedChecksum}) {
+function cssFilename ({bundleName, variant, brandId, combinedChecksum, includesNoVariables}) {
   const {dir, name} = path.posix.parse(bundleName)
-  const outputDir = path.join(PATHS.output_dir, brandId || '', variant, dir)
-  return path.join(outputDir, `${name}-${combinedChecksum}.css`)
+  const baseDir = includesNoVariables ? 'no_variables' : path.join(brandId || '', variant)
+  return path.join(PATHS.output_dir, baseDir, dir, `${name}-${combinedChecksum}.css`)
 }
 
-function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles}) {
-  cache.bundles_with_deps.update(cacheKey(bundleName, variant), {combinedChecksum, includedFiles})
-  const filename = cssFilename({bundleName, variant, brandId, combinedChecksum})
-  return outputFile(filename, css)
+function cdnObjectName (cssFilename) {
+  return cssFilename.replace(PATHS.public_dir + '/', '')
+}
+
+function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles, includesNoVariables}) {
+  cache.bundles_with_deps.update(cacheKey(bundleName, variant), {combinedChecksum, includedFiles, includesNoVariables})
+  const filename = cssFilename({bundleName, variant, brandId, combinedChecksum, includesNoVariables})
+  return s3Bucket ? s3Bucket.uploadCSS(cdnObjectName(filename), css) : outputFile(filename, css)
 }
 
 function onBundleDeleted (bundleName) {

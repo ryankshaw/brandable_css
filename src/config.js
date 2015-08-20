@@ -1,4 +1,3 @@
-import fs from 'fs'
-import yaml from 'js-yaml'
+import loadConfig from './loadConfig'
 
-export default Object.freeze(yaml.safeLoad(fs.readFileSync('config/brandable_css.yml')))
+export default loadConfig('config/brandable_css.yml')
