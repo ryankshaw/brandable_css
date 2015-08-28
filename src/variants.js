@@ -1,6 +1,7 @@
 import config from './config'
 
 const variants = Object.freeze(Object.keys(config.variants))
-
 export default variants
-export const BRANDABLE_VARIANTS = new Set(variants.filter((v) => config.variants[v].brandable))
+
+const isBrandable = (variant) => config.variants[variant].brandable
+export const BRANDABLE_VARIANTS = Object.freeze(new Set(variants.filter(isBrandable)))

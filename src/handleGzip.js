@@ -1,4 +1,4 @@
-import { promisify } from 'bluebird'
+import {promisify} from 'bluebird'
 const gzip = promisify(require('node-zopfli').gzip)
 import {debug} from './utils'
 
