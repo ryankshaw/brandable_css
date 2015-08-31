@@ -61,7 +61,7 @@ async function findChangedBundles (bundles, onlyCheckThisBrandId) {
   const unchangedFiles = new Set()
   const toCompile = {}
   const brandIds = onlyCheckThisBrandId ? [onlyCheckThisBrandId] : getBrandIds()
-  const variants = onlyCheckThisBrandId ? BRANDABLE_VARIANTS : VARIANTS
+  const variants = onlyCheckThisBrandId ? [...BRANDABLE_VARIANTS] : VARIANTS
 
   function fasterHasFileChanged (filename) {
     // debug('fasterHasFileChanged', filename)
