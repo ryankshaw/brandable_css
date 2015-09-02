@@ -3,7 +3,7 @@
   "version": "0.0.44",
   "description": "This is what we use to compile sass in canvas-lms with all our variants and custom theme editor css",
   "scripts": {
-    "build": "./node_modules/.bin/standard --verbose && ./node_modules/.bin/babel src --stage 0 --out-dir lib",
+    "build": "./node_modules/.bin/standard --verbose && ./node_modules/.bin/babel src --out-dir lib",
     "dev": "npm run build -- --watch",
     "prepublish": "npm run build",
     "release": "npm shrinkwrap && npm version patch && git push && npm publish",
