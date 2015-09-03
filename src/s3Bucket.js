@@ -29,7 +29,13 @@ const customMethods = {
   }
 }
 
-const CDN_CONFIG = (loadConfig('config/canvas_cdn.yml') || {})[process.env.RAILS_ENV || 'development']
+let yamlData
+try {
+  yamlData = loadConfig('config/canvas_cdn.yml')
+} catch (e) {
+  yamlData = {}
+}
+const CDN_CONFIG = yamlData[process.env.RAILS_ENV || 'development']
 let s3Bucket
 if (CDN_CONFIG.bucket) {
   AWS.config.update({
