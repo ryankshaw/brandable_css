@@ -37,7 +37,7 @@ try {
 }
 const CDN_CONFIG = yamlData[process.env.RAILS_ENV || 'development']
 let s3Bucket
-if (CDN_CONFIG.bucket) {
+if (CDN_CONFIG && CDN_CONFIG.bucket) {
   AWS.config.update({
     logger: {log: debug},
     accessKeyId: CDN_CONFIG.aws_access_key_id,
