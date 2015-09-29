@@ -7,7 +7,7 @@ export function readJsonSync (filename) {
   debug('reading', filename)
   try {
     return fs.readJsonSync(filename)
-  } catch(e) {
+  } catch (e) {
     debug("couldn't read", filename, 'using empty cache')
     return {}
   }

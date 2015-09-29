@@ -18,7 +18,7 @@ export function relativeFileChecksum (relativePath) {
 export function fileChecksumSync (filename) {
   try {
     return checksum(fs.readFileSync(filename))
-  } catch(e) {
+  } catch (e) {
     return ''
   }
 }

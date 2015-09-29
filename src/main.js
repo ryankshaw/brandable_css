@@ -27,7 +27,7 @@ function fsExists (path) {
 function getBrandIds () {
   try {
     return fs.readdirSync(PATHS.branded_scss_folder)
-  } catch(e) {
+  } catch (e) {
     return []
   }
 }
@@ -48,9 +48,9 @@ async function cacheFor (bundleName, variant, /* optional */ brandId) {
     includesNoVariables: cached.includesNoVariables
   })
 
-  const cssFileExists = await (s3Bucket ?
-    s3Bucket.objectExists(cdnObjectName(filename)) :
-    fsExists(filename)
+  const cssFileExists = await (s3Bucket
+    ? s3Bucket.objectExists(cdnObjectName(filename))
+    : fsExists(filename)
   )
   if (cssFileExists) return cached
 }
@@ -253,7 +253,7 @@ async function onFilesystemChange (eventType, filePath, details) {
       return await processChangedBundles(whatToCompileIfFileChanges(filePath))
     }
     debug('unchanged', filePath)
-  } catch(e) {
+  } catch (e) {
     onError(e)
   }
 }
