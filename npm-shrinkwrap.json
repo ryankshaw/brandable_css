@@ -1,6 +1,6 @@
 {
   "name": "brandable_css",
-  "version": "0.0.47",
+  "version": "0.0.48",
   "dependencies": {
     "abbrev": {
       "version": "1.0.7",
