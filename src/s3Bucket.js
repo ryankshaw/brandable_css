@@ -7,6 +7,14 @@ import {debug} from './utils'
 import handleGzip from './handleGzip'
 
 const customMethods = {
+  uploadAsync () {
+    return retry(promisify(this.upload).apply(this, arguments))
+  },
+
+  getObjectAsync () {
+    return promisify(this.getObject).apply(this, arguments)
+  },
+
   objectExists: memoize(async function (Key) {
     return new Promise((resolve) => {
       this.headObject({Key}, (err, data) => {
@@ -23,7 +31,7 @@ const customMethods = {
       CacheControl: 'public, max-age=31557600',
       ContentType: 'text/css'
     })
-    const data = await retry(promisify(this.upload.bind(this, params)))
+    const data = await this.uploadAsync(params)
     debug('UploadedCSS', Key, data)
     return data
   }

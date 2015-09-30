@@ -1,28 +1,19 @@
-import Promise from 'bluebird'
-import fs from 'fs-extra'
-const outputFile = Promise.promisify(fs.outputFile)
-const glob = Promise.promisify(require('glob'))
+import {promisify} from 'bluebird'
+import fs from 'fs-extra-promise'
+const glob = promisify(require('glob'))
 import path from 'path'
 import _ from 'lodash'
 import chalk from 'chalk'
 import chokidar from 'chokidar'
-
 import {checksum, relativeFileChecksum} from './checksum'
 import compileSingleBundle from './compileBundle'
-import {debug, relativeSassPath, isSassPartial, folderForBrandId, onError} from './utils'
+import {debug, relativeSassPath, isSassPartial, folderForBrandId, onError, cdnObjectName} from './utils'
 import {manifest_key_seperator, paths as PATHS} from './config'
 import VARIANTS, {BRANDABLE_VARIANTS} from './variants'
 import cache from './cache'
 import limitConcurrency from './limitConcurrency'
 import writeDefaultBrandableVariablesScss from './writeDefaultBrandableVariablesScss'
 import s3Bucket from './s3Bucket'
-
-// a promise version of fs.exists
-function fsExists (path) {
-  return new Promise(function (resolve) {
-    fs.exists(path, resolve)
-  })
-}
 
 function getBrandIds () {
   try {
@@ -50,7 +41,7 @@ async function cacheFor (bundleName, variant, /* optional */ brandId) {
 
   const cssFileExists = await (s3Bucket
     ? s3Bucket.objectExists(cdnObjectName(filename))
-    : fsExists(filename)
+    : fs.existsAsync(filename)
   )
   if (cssFileExists) return cached
 }
@@ -210,10 +201,6 @@ function cssFilename ({bundleName, variant, brandId, combinedChecksum, includesN
   return path.join(PATHS.output_dir, baseDir, dir, `${name}-${combinedChecksum}.css`)
 }
 
-function cdnObjectName (cssFilename) {
-  return cssFilename.replace(PATHS.public_dir + '/', '')
-}
-
 function updateCache ({variant, bundleName, combinedChecksum, includedFiles, includesNoVariables}) {
   cache.bundles_with_deps.update(cacheKey(bundleName, variant), {combinedChecksum, includedFiles, includesNoVariables})
 }
@@ -223,7 +210,7 @@ function writeCss ({css, variant, bundleName, brandId, combinedChecksum, include
   const filename = cssFilename({bundleName, variant, brandId, combinedChecksum, includesNoVariables})
   // this option is for deployers so they can create the 2 manifest files but not write any css files to the tarball.
   if (process.env.ONLY_GENERATE_MANIFESTS) return
-  return s3Bucket ? s3Bucket.uploadCSS(cdnObjectName(filename), css) : outputFile(filename, css)
+  return s3Bucket ? s3Bucket.uploadCSS(cdnObjectName(filename), css) : fs.outputFileAsync(filename, css)
 }
 
 function onBundleDeleted (bundleName) {

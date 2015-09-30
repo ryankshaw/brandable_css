@@ -1,22 +1,26 @@
-const debug = require('debug')('brandable_css')
+const debug = require('debug')('brandable_css:cache')
 import _ from 'lodash'
-import { readJsonSync } from './utils'
-import { paths as PATHS } from './config'
+import {cdnObjectName} from './utils'
+import {paths as PATHS} from './config'
+import s3Bucket from './s3Bucket'
 import SASS_STYLE from './sass_style'
-const outputJson = require('bluebird').promisify(require('fs-extra').outputJson)
+import {readJsonAsync, outputJsonAsync} from 'fs-extra-promise'
 
 const caches = ['file_checksums', 'bundles_with_deps']
 
 let cache = {
-  saveAll () {
-    return caches.map(cacheName => cache[cacheName].save())
+  saveAll: async function () {
+    await* caches.map(cacheName => cache[cacheName].save())
+  },
+
+  init: async function () {
+    await* caches.map(initCache)
   }
 }
 
-function initCache (name) {
+async function initCache (name) {
   const filename = PATHS[name] + SASS_STYLE
   let self = {
-    data: readJsonSync(filename),
     isSaved: false,
 
     update (key, value) {
@@ -28,19 +32,44 @@ function initCache (name) {
       return value
     },
 
+    read: async function() {
+      let data
+      try {
+        if (s3Bucket) {
+          debug('reading from s3', filename)
+          data = JSON.parse(await s3Bucket.getObject({Key: cdnObjectName(filename)}))
+        } else {
+          debug('reading from fs', filename)
+          data = await readJsonAsync(filename)
+        }
+      } catch (e) {
+        debug(`couldnt read ${filename}, using empty cache`)
+        data = {}
+      }
+      self.isSaved = false
+      self.data = data
+    },
+
     save () {
       debug('saving', self.isSaved, filename)
       if (self.isSaved) return
       self.isSaved = true
-      return outputJson(filename, self.data, {spaces: 2})
+      if (s3Bucket) {
+        return s3Bucket.uploadAsync({
+          Key: cdnObjectName(filename),
+          Body: JSON.stringify(self.data, null, 2)
+        })
+      } else {
+        return outputJsonAsync(filename, self.data, {spaces: 2})
+      }
     },
 
     clearMatching (query) {
       self.data = _.omit(self.data, (v, key) => key.match(query))
     }
   }
+  await self.read()
   cache[name] = self
 }
-caches.forEach(initCache)
 
 export default cache

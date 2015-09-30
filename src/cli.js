@@ -1,6 +1,7 @@
 import program from 'commander'
 import { checkAll, startWatcher } from './main'
 import { onError } from './utils'
+import { init } from './cache'
 
 program
   .version(require('../package').version)
@@ -9,7 +10,7 @@ program
 
 program.parse(process.argv)
 
-checkAll({brandId: program.brandId}).catch(onError)
-if (program.watch) {
-  startWatcher()
-}
+init().then(() => {
+  checkAll({brandId: program.brandId}).catch(onError)
+  if (program.watch) startWatcher()
+}).catch(onError)
