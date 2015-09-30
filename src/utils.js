@@ -1,17 +1,6 @@
 export const debug = require('debug')('brandable_css')
 import path from 'path'
-import fs from 'fs-extra'
 import { paths as PATHS } from './config'
-
-export function readJsonSync (filename) {
-  debug('reading', filename)
-  try {
-    return fs.readJsonSync(filename)
-  } catch (e) {
-    debug("couldn't read", filename, 'using empty cache')
-    return {}
-  }
-}
 
 export function folderForBrandId (brandId) {
   return path.join(PATHS.branded_scss_folder, brandId)
