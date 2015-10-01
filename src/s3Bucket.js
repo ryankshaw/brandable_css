@@ -5,14 +5,19 @@ import retry from 'bluebird-retry'
 import loadConfig from './loadConfig'
 import {debug} from './utils'
 import handleGzip from './handleGzip'
+import {gunzip} from 'zlib'
+const gunzipAsync = promisify(gunzip)
 
 const customMethods = {
-  uploadAsync () {
-    return retry(promisify(this.upload).apply(this, arguments))
+  uploadAsync: async function (params) {
+    params = await handleGzip(Object.assign({ACL: 'public-read'}, params))
+    return retry(promisify(this.upload.bind(this, params)))
   },
 
-  getObjectAsync () {
-    return promisify(this.getObject).apply(this, arguments)
+  downloadAsync: async function () {
+    const resp = await promisify(this.getObject).apply(this, arguments)
+    if (resp.ContentEncoding === 'gzip') return await gunzipAsync(resp.Body)
+    return resp.Body
   },
 
   objectExists: memoize(async function (Key) {
@@ -24,14 +29,12 @@ const customMethods = {
   }),
 
   uploadCSS: async function (Key, css) {
-    const params = await handleGzip({
+    const data = await this.uploadAsync({
       Key,
-      ACL: 'public-read',
       Body: css,
       CacheControl: 'public, max-age=31557600',
       ContentType: 'text/css'
     })
-    const data = await this.uploadAsync(params)
     debug('UploadedCSS', Key, data)
     return data
   }

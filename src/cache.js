@@ -6,6 +6,13 @@ import s3Bucket from './s3Bucket'
 import SASS_STYLE from './sass_style'
 import {readJsonAsync, outputJsonAsync} from 'fs-extra-promise'
 
+// if we're using s3, we want to use the file cached from the last time THIS ENV (prod/beta)
+// in THIS REGION (eu, syd, sin, etc) ran brandable_css. That way, if we:
+// 1. deploy to beta, 2. then to prod, 3.then to beta
+// We use step 1's cache and not step 2's.
+// set this environmnet variable to something unique (like: 'production-syd') to do that.
+const UNIQUE_KEY = (s3Bucket && process.env.UNIQUE_KEY_FOR_BRANDABLE_CSS_MANIFEST) || ''
+
 const caches = ['file_checksums', 'bundles_with_deps']
 
 let cache = {
@@ -19,7 +26,7 @@ let cache = {
 }
 
 async function initCache (name) {
-  const filename = PATHS[name] + SASS_STYLE
+  const filename = PATHS[name] + SASS_STYLE + UNIQUE_KEY
   let self = {
     isSaved: false,
 
@@ -37,7 +44,7 @@ async function initCache (name) {
       try {
         if (s3Bucket) {
           debug('reading from s3', filename)
-          data = JSON.parse(await s3Bucket.getObject({Key: cdnObjectName(filename)}))
+          data = JSON.parse(await s3Bucket.downloadAsync({Key: cdnObjectName(filename)}))
         } else {
           debug('reading from fs', filename)
           data = await readJsonAsync(filename)
