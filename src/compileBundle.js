@@ -40,8 +40,11 @@ export default async function compileBundle ({bundleName, variant, brandId}) {
   let urlsFoundInCss = new Set()
   function putMD5sInUrls (originalUrl) {
     const parsedUrl = url.parse(originalUrl)
+    if (!parsedUrl.pathname || parsedUrl.protocol === 'data:') {
+      return originalUrl
+    }
     if (parsedUrl.host || parsedUrl.href.indexOf('//') === 0 || !parsedUrl.path) {
-      warn(sassFile, 'has an external url() to:', originalUrl, 'that\'s not a problem but normally our css only links to files in our repo')
+      warn(bundleName, variant, 'has an external url() to:', originalUrl, 'that\'s not a problem but normally our css only links to files in our repo')
       return originalUrl
     }
     const pathToFile = path.join(PATHS.public_dir, parsedUrl.pathname)
@@ -50,7 +53,7 @@ export default async function compileBundle ({bundleName, variant, brandId}) {
     if (!md5) {
       md5 = fileChecksumSync(pathToFile)
       if (!md5) {
-        warn(sassFile, variant, 'contains a url() to:', originalUrl, 'which doesn\'t exist on disk')
+        warn(bundleName, variant, 'contains a url() to:', originalUrl, 'which doesn\'t exist on disk')
         return originalUrl
       }
       cache.file_checksums.update(relativePath, md5)

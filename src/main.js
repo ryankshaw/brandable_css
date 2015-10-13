@@ -7,7 +7,7 @@ import chalk from 'chalk'
 import chokidar from 'chokidar'
 import {checksum, relativeFileChecksum} from './checksum'
 import compileSingleBundle from './compileBundle'
-import {debug, relativeSassPath, isSassPartial, folderForBrandId, onError, cdnObjectName} from './utils'
+import {debug, relativeSassPath, isSassPartial, onError} from './utils'
 import {manifest_key_seperator, paths as PATHS} from './config'
 import VARIANTS, {BRANDABLE_VARIANTS} from './variants'
 import cache from './cache'
@@ -27,23 +27,16 @@ function cacheKey (bundleName, variant) {
   return [bundleName, variant].join(manifest_key_seperator)
 }
 
-async function cacheFor (bundleName, variant, /* optional */ brandId) {
-  const cached = cache.bundles_with_deps.data[cacheKey(bundleName, variant)]
-  if (!cached) return
+function cacheFor (bundleName, variant) {
+  return cache.bundles_with_deps.data[cacheKey(bundleName, variant)]
+}
 
-  const filename = cssFilename({
-    bundleName,
-    variant,
-    brandId,
-    combinedChecksum: cached.combinedChecksum,
-    includesNoVariables: cached.includesNoVariables
-  })
-
-  const cssFileExists = await (s3Bucket
+function cssFileExists ({bundleName, variant, /* optional */ brandId, combinedChecksum, includesNoVariables}) {
+  const filename = cssFilename({bundleName, variant, brandId, combinedChecksum, includesNoVariables})
+  return (s3Bucket
     ? s3Bucket.objectExists(cdnObjectName(filename))
     : fs.existsAsync(filename)
   )
-  if (cssFileExists) return cached
 }
 
 // This is a fast way to find all the bundles that need to be rebuilt on startup
@@ -52,7 +45,7 @@ async function findChangedBundles (bundles, onlyCheckThisBrandId) {
   const unchangedFiles = new Set()
   const toCompile = {}
   const brandIds = onlyCheckThisBrandId ? [onlyCheckThisBrandId] : getBrandIds()
-  const variants = onlyCheckThisBrandId ? [...BRANDABLE_VARIANTS] : VARIANTS
+  const variantsToCheck = onlyCheckThisBrandId ? [...BRANDABLE_VARIANTS] : VARIANTS
 
   function fasterHasFileChanged (filename) {
     // debug('fasterHasFileChanged', filename)
@@ -66,37 +59,43 @@ async function findChangedBundles (bundles, onlyCheckThisBrandId) {
 
   await* bundles.map(async function (bundleName) {
     let includesNoVariables
-    await* variants.map(async function (variant) {
+    await* variantsToCheck.map(async function (variant) {
       if (includesNoVariables) return
       let thisVariantHasChanged = false
-      const cached = await cacheFor(bundleName, variant)
-      debug('cached was', cached)
+      const cached = cacheFor(bundleName, variant)
+      debug('cached was', bundleName, variant, cached)
       if (!cached) {
         thisVariantHasChanged = true
         changedFiles.add(bundleName)
       } else {
+        if (cached.includesNoVariables) includesNoVariables = true
         for (let filename of cached.includedFiles) {
           if (fasterHasFileChanged(filename)) {
             thisVariantHasChanged = true
             break
           }
         }
-      }
-      if (!thisVariantHasChanged && cached.includesNoVariables) {
-        // then we don't need to even check other variants or branded versions of this bundle
-        includesNoVariables = true
-        return
+        if (!thisVariantHasChanged && !(await cssFileExists({
+          bundleName,
+          variant,
+          combinedChecksum: cached.combinedChecksum,
+          includesNoVariables: cached.includesNoVariables
+        }))) {
+          thisVariantHasChanged = true
+        }
       }
       if (thisVariantHasChanged) {
         _.set(toCompile, [bundleName, variant, 'compileSelf'], true)
       }
-      if (BRANDABLE_VARIANTS.has(variant)) {
+      if (!includesNoVariables && BRANDABLE_VARIANTS.has(variant)) {
         for (const brandId of brandIds) {
-          const brandVarFile = relativeSassPath(path.join(folderForBrandId(brandId), '_brand_variables.scss'))
-          if (fasterHasFileChanged(brandVarFile) ||
-              thisVariantHasChanged ||
-              !(await cacheFor(bundleName, variant, brandId))
-          ) {
+          if (thisVariantHasChanged || !(await cssFileExists({
+            bundleName,
+            variant,
+            brandId,
+            combinedChecksum: cached.combinedChecksum,
+            includesNoVariables: cached.includesNoVariables
+          }))) {
             _.set(toCompile, [bundleName, variant, brandId], true)
           }
         }
@@ -120,6 +119,8 @@ export async function checkAll ({brandId}) {
 }
 
 async function processChangedBundles (changedBundles) {
+  debug('processing these bundles', changedBundles)
+
   await* _.map(changedBundles, async function(variants, bundleName) {
     let includesNoVariables
 
@@ -171,28 +172,52 @@ function getChecksum (relativePath) {
 // We don't want to just fire off all the work at the same time because we're CPU contstrained anyway
 // and it will just cause it to consume a ton of memory, so just do 60 at a time. that'll be plenty
 // to keep the CPU busy.
-const compileBundle = limitConcurrency(60, async function ({variant, bundleName, brandId, unbrandedCombinedChecksum}) {
+const concurrency = parseInt(process.env.BRANDABLE_CSS_CONCURRENCY, 10) || 60
+const compileBundle = limitConcurrency(concurrency, async function ({variant, bundleName, brandId, unbrandedCombinedChecksum}) {
   if (brandId && !unbrandedCombinedChecksum) throw new Error('must provide unbrandedCombinedChecksum if compiling a branded bundle')
+
+  // Even if we still think we need to generate a branded css bundle, it might already exist.
+  // If it does we have enough info now to know with certainty if we can skip.
+  if (brandId && await cssFileExists({bundleName, variant, brandId, combinedChecksum: unbrandedCombinedChecksum})) {
+    const msg = chalk.cyan(bundleName, variant, brandId, unbrandedCombinedChecksum, 'already exists.')
+    if (process.env.BRANDABLE_CSS_FORCE_UPLOAD_EVEN_IF_EXISTS) {
+      console.info(chalk.magenta('force generating', msg, 'since you set BRANDABLE_CSS_FORCE_UPLOAD_EVEN_IF_EXISTS'))
+    } else {
+      console.info(chalk.gray('skipping:', msg, 'set BRANDABLE_CSS_FORCE_UPLOAD_EVEN_IF_EXISTS to generate anyway'))
+      return {variant, bundleName, brandId, unbrandedCombinedChecksum}
+    }
+  }
+
   const result = await compileSingleBundle({bundleName, variant, brandId})
   const includedFiles = result.includedFiles.map(relativeSassPath)
   if (watcher) {
     result.includedFiles.forEach(f => watcher.add(f))
   }
-
-  const md5s = includedFiles.map(getChecksum)
-  const combinedChecksum = brandId ? unbrandedCombinedChecksum : checksum(result.css + md5s)
-
-  const finalResult = {
-    css: result.css,
-    combinedChecksum,
+  const metaData = {
     variant,
     bundleName,
     brandId,
-    includedFiles,
-    includesNoVariables: !_.includes(includedFiles, relativeSassPath(PATHS.brandable_variables_defaults_scss))
+    includedFiles
   }
-  await writeCss(finalResult)
-  return finalResult
+  if (brandId) {
+    metaData.combinedChecksum = unbrandedCombinedChecksum
+  } else {
+    const md5s = includedFiles.map(getChecksum)
+    metaData.combinedChecksum = brandId ? unbrandedCombinedChecksum : checksum(result.css + md5s)
+    metaData.includesNoVariables = !_.includes(includedFiles, relativeSassPath(PATHS.brandable_variables_defaults_scss))
+    updateCache(metaData)
+  }
+
+  // This option is for deployers so they can create just the 2 manifest files
+  // but not write any css files to the tarball.
+  if (process.env.ONLY_GENERATE_MANIFESTS) return
+
+  const filename = cssFilename(metaData)
+  await (s3Bucket
+    ? s3Bucket.uploadCSS(cdnObjectName(filename), result.css)
+    : fs.outputFileAsync(filename, result.css)
+  )
+  return metaData
 })
 
 function cssFilename ({bundleName, variant, brandId, combinedChecksum, includesNoVariables}) {
@@ -201,16 +226,12 @@ function cssFilename ({bundleName, variant, brandId, combinedChecksum, includesN
   return path.join(PATHS.output_dir, baseDir, dir, `${name}-${combinedChecksum}.css`)
 }
 
-function updateCache ({variant, bundleName, combinedChecksum, includedFiles, includesNoVariables}) {
-  cache.bundles_with_deps.update(cacheKey(bundleName, variant), {combinedChecksum, includedFiles, includesNoVariables})
+function cdnObjectName (filename) {
+  return filename.replace(PATHS.public_dir + '/', '')
 }
 
-function writeCss ({css, variant, bundleName, brandId, combinedChecksum, includedFiles, includesNoVariables}) {
-  updateCache({bundleName, variant, combinedChecksum, includedFiles, includesNoVariables})
-  const filename = cssFilename({bundleName, variant, brandId, combinedChecksum, includesNoVariables})
-  // this option is for deployers so they can create the 2 manifest files but not write any css files to the tarball.
-  if (process.env.ONLY_GENERATE_MANIFESTS) return
-  return s3Bucket ? s3Bucket.uploadCSS(cdnObjectName(filename), css) : fs.outputFileAsync(filename, css)
+function updateCache ({variant, bundleName, combinedChecksum, includedFiles, includesNoVariables}) {
+  cache.bundles_with_deps.update(cacheKey(bundleName, variant), {combinedChecksum, includedFiles, includesNoVariables})
 }
 
 function onBundleDeleted (bundleName) {

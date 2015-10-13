@@ -18,7 +18,3 @@ export function onError (err) {
   console.error('error compiling sass', err, err.stack, err.message)
   process.exit(1)
 }
-
-export function cdnObjectName (filename) {
-  return filename.replace(PATHS.public_dir + '/', '')
-}

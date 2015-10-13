@@ -5,19 +5,11 @@ import retry from 'bluebird-retry'
 import loadConfig from './loadConfig'
 import {debug} from './utils'
 import handleGzip from './handleGzip'
-import {gunzip} from 'zlib'
-const gunzipAsync = promisify(gunzip)
 
 const customMethods = {
   uploadAsync: async function (params) {
     params = await handleGzip(Object.assign({ACL: 'public-read'}, params))
     return retry(promisify(this.upload.bind(this, params)))
-  },
-
-  downloadAsync: async function () {
-    const resp = await promisify(this.getObject).apply(this, arguments)
-    if (resp.ContentEncoding === 'gzip') return await gunzipAsync(resp.Body)
-    return resp.Body
   },
 
   objectExists: memoize(async function (Key) {
