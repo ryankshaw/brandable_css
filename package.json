@@ -18,7 +18,6 @@
     "bin",
     "lib"
   ],
-  "engineStrict": true,
   "engines": {
     "npm": ">=2.5.1",
     "node": ">=0.12.0"
