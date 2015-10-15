@@ -17,7 +17,11 @@ function initCache (name) {
   let self = {
     isSaved: false,
 
-    data: readJsonSync(filename, {throws: false}) || {},
+    data: (() => {
+      let json
+      try { json = readJsonSync(filename) } catch (e) {}
+      return json || {}
+    })(),
 
     update (key, value) {
       if (_.isFunction(key)) throw new Error('cant use function as key' + key + value)

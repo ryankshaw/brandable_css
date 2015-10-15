@@ -69,12 +69,16 @@ async function findChangedBundles (bundles, onlyCheckThisBrandId) {
         changedFiles.add(bundleName)
       } else {
         if (cached.includesNoVariables) includesNoVariables = true
+
+        // check all files on disk included in this bundle to see if the've changed
         for (let filename of cached.includedFiles) {
           if (fasterHasFileChanged(filename)) {
             thisVariantHasChanged = true
             break
           }
         }
+
+        // check to actually make sure the css file exists
         if (!thisVariantHasChanged && !(await cssFileExists({
           bundleName,
           variant,
