@@ -207,7 +207,7 @@ const compileBundle = limitConcurrency(concurrency, async function ({variant, bu
     metaData.combinedChecksum = unbrandedCombinedChecksum
   } else {
     const md5s = includedFiles.map(getChecksum)
-    metaData.combinedChecksum = brandId ? unbrandedCombinedChecksum : checksum(result.css + md5s)
+    metaData.combinedChecksum = checksum(result.css + md5s)
     metaData.includesNoVariables = !_.includes(includedFiles, relativeSassPath(PATHS.brandable_variables_defaults_scss))
     updateCache(metaData)
   }
