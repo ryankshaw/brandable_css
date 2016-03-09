@@ -31,6 +31,14 @@ function cacheFor (bundleName, variant) {
   return cache.bundles_with_deps.data[cacheKey(bundleName, variant)]
 }
 
+export function allFingerprintsFor(bundleName) {
+  return VARIANTS.reduce((variant, obj) => {
+    const cached = cacheFor(bundleName, variant)
+    if (cached) obj[variant] = _.pick(cached, ['combinedChecksum', 'includesNoVariables'])
+    return obj
+  }, {})
+}
+
 function cssFileExists ({bundleName, variant, /* optional */ brandId, combinedChecksum, includesNoVariables}) {
   const filename = cssFilename({bundleName, variant, brandId, combinedChecksum, includesNoVariables})
   return (s3Bucket
@@ -134,7 +142,7 @@ async function processChangedBundles (changedBundles) {
       if (typeof includesNoVariables === 'undefined') {
         includesNoVariables = result.includesNoVariables
         if (includesNoVariables) {
-          VARIANTS.map(variant => updateCache(_.defaults({variant}, result)))
+          VARIANTS.forEach(variant => updateCache(_.defaults({variant}, result)))
         }
       }
       return result
