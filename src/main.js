@@ -31,7 +31,7 @@ function cacheFor (bundleName, variant) {
   return cache.bundles_with_deps.data[cacheKey(bundleName, variant)]
 }
 
-export function allFingerprintsFor(bundleName) {
+export function allFingerprintsFor (bundleName) {
   return VARIANTS.reduce((variant, obj) => {
     const cached = cacheFor(bundleName, variant)
     if (cached) obj[variant] = _.pick(cached, ['combinedChecksum', 'includesNoVariables'])
