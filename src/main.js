@@ -35,6 +35,7 @@ export function allFingerprintsFor (bundleName) {
   return VARIANTS.reduce((accumulator, variant) => {
     const cached = cacheFor(bundleName, variant)
     if (cached) accumulator[variant] = cached
+    return accumulator
   }, {})
 }
 
