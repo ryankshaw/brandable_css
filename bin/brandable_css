@@ -5,5 +5,5 @@
 process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE ||
                                  Math.max(require('os').cpus().length, 4)
 
-require("babel/polyfill")
+require('babel-polyfill')
 require('../lib/cli')

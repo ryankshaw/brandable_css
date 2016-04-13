@@ -8,7 +8,8 @@ import chokidar from 'chokidar'
 import {checksum, relativeFileChecksum} from './checksum'
 import compileSingleBundle from './compileBundle'
 import {debug, relativeSassPath, isSassPartial, onError} from './utils'
-import {manifest_key_seperator, paths as PATHS} from './config'
+import CONFIG from './config'
+const PATHS = CONFIG.paths
 import VARIANTS, {BRANDABLE_VARIANTS} from './variants'
 import cache from './cache'
 import limitConcurrency from './limitConcurrency'
@@ -24,7 +25,7 @@ function getBrandIds () {
 }
 
 function cacheKey (bundleName, variant) {
-  return [bundleName, variant].join(manifest_key_seperator)
+  return [bundleName, variant].join(CONFIG.manifest_key_seperator)
 }
 
 function cacheFor (bundleName, variant) {
@@ -65,9 +66,9 @@ async function findChangedBundles (bundles, onlyCheckThisBrandId) {
     return iHaveChanged
   }
 
-  await* bundles.map(async function (bundleName) {
+  await Promise.all(bundles.map(async function (bundleName) {
     let includesNoVariables
-    await* variantsToCheck.map(async function (variant) {
+    await Promise.all(variantsToCheck.map(async function (variant) {
       if (includesNoVariables) return
       let thisVariantHasChanged = false
       const cached = cacheFor(bundleName, variant)
@@ -112,8 +113,8 @@ async function findChangedBundles (bundles, onlyCheckThisBrandId) {
           }
         }
       }
-    })
-  })
+    }))
+  }))
   return toCompile
 }
 
@@ -133,7 +134,7 @@ export async function checkAll ({brandId}) {
 async function processChangedBundles (changedBundles) {
   debug('processing these bundles', changedBundles)
 
-  await* _.map(changedBundles, async function(variants, bundleName) {
+  await Promise.all(_.map(changedBundles, async function(variants, bundleName) {
     let includesNoVariables
 
     async function compileUnlessIncludesNoVariables ({variant, brandId, unbrandedCombinedChecksum}) {
@@ -142,17 +143,17 @@ async function processChangedBundles (changedBundles) {
       if (typeof includesNoVariables === 'undefined') {
         includesNoVariables = result.includesNoVariables
         if (includesNoVariables) {
-          VARIANTS.forEach(variant => updateCache(_.defaults({variant}, result)))
+          VARIANTS.forEach((variant) => updateCache(_.defaults({variant}, result)))
         }
       }
       return result
     }
 
-    await* Object.keys(variants).map(async function (variant) {
+    await Promise.all(Object.keys(variants).map(async function (variant) {
       if (includesNoVariables) return
       let unbrandedCombinedChecksum
       let compileSelf = variants[variant].compileSelf
-      const brandIds = Object.keys(variants[variant]).filter(k => k !== 'compileSelf')
+      const brandIds = Object.keys(variants[variant]).filter((k) => k !== 'compileSelf')
 
       // The 'combinedChecksum' for the branded versions needs to be the same as the stock, unbranded result.
       // That is the only way we can load css dynamically in handlebars/js files.
@@ -167,9 +168,9 @@ async function processChangedBundles (changedBundles) {
       }
 
       if (compileSelf) unbrandedCombinedChecksum = (await compileUnlessIncludesNoVariables({variant})).combinedChecksum
-      await* brandIds.map(brandId => compileUnlessIncludesNoVariables({variant, brandId, unbrandedCombinedChecksum}))
-    })
-  })
+      await Promise.all(brandIds.map((brandId) => compileUnlessIncludesNoVariables({variant, brandId, unbrandedCombinedChecksum})))
+    }))
+  }))
   cache.saveAll()
 }
 
@@ -203,7 +204,7 @@ const compileBundle = limitConcurrency(concurrency, async function ({variant, bu
   const result = await compileSingleBundle({bundleName, variant, brandId})
   const includedFiles = result.includedFiles.map(relativeSassPath)
   if (watcher) {
-    result.includedFiles.forEach(f => watcher.add(f))
+    result.includedFiles.forEach((f) => watcher.add(f))
   }
   const metaData = {
     variant,
@@ -294,7 +295,7 @@ function whatToCompileIfFileChanges (filename) {
   } else {
     for (const key in cache.bundles_with_deps.data) {
       if (_.includes(cache.bundles_with_deps.data[key].includedFiles, filename)) {
-        const [bundleName, variant, brandId] = key.split(manifest_key_seperator)
+        const [bundleName, variant, brandId] = key.split(CONFIG.manifest_key_seperator)
         _.set(toCompile, [bundleName, variant, brandId || 'compileSelf'], true)
       }
     }
@@ -329,7 +330,7 @@ export function startWatcher () {
   debug('watching for changes to any scss files')
   watcher = chokidar
     .watch(PATHS.brandable_variables_json, {persistent: true, cwd: PATHS.sass_dir})
-    .on('add', f => debug('file added to watcher', f))
+    .on('add', (f) => debug('file added to watcher', f))
     .add(PATHS.all_sass_bundles)
 
   for (const key in cache.bundles_with_deps.data) {

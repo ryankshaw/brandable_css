@@ -1,6 +1,6 @@
 const debug = require('debug')('brandable_css:cache')
 import _ from 'lodash'
-import {paths as PATHS} from './config'
+import CONFIG from './config'
 import SASS_STYLE from './sass_style'
 import {readJsonSync, outputJsonAsync} from 'fs-extra-promise'
 
@@ -8,12 +8,12 @@ const caches = ['file_checksums', 'bundles_with_deps']
 
 let cache = {
   saveAll: async function () {
-    await* caches.map(cacheName => cache[cacheName].save())
+    return Promise.all(caches.map((cacheName) => cache[cacheName].save()))
   }
 }
 
 function initCache (name) {
-  const filename = PATHS[name] + SASS_STYLE
+  const filename = CONFIG.paths[name] + SASS_STYLE
   let self = {
     isSaved: false,
 

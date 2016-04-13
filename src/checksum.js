@@ -1,7 +1,7 @@
 import revHash from 'rev-hash'
 import fs from 'fs'
 import path from 'path'
-import { paths as PATHS } from './config'
+import CONFIG from './config'
 
 export function checksum (data) {
   if (typeof data === 'string') {
@@ -12,7 +12,7 @@ export function checksum (data) {
 }
 
 export function relativeFileChecksum (relativePath) {
-  return fileChecksumSync(path.join(PATHS.sass_dir, relativePath))
+  return fileChecksumSync(path.join(CONFIG.paths.sass_dir, relativePath))
 }
 
 export function fileChecksumSync (filename) {

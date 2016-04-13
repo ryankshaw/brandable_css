@@ -1,13 +1,13 @@
 export const debug = require('debug')('brandable_css')
 import path from 'path'
-import { paths as PATHS } from './config'
+import CONFIG from './config'
 
 export function folderForBrandId (brandId) {
-  return path.join(PATHS.branded_scss_folder, brandId)
+  return path.join(CONFIG.paths.branded_scss_folder, brandId)
 }
 
 export function relativeSassPath (absPath) {
-  return path.relative(path.join(process.cwd(), PATHS.sass_dir), absPath)
+  return path.relative(path.join(process.cwd(), CONFIG.paths.sass_dir), absPath)
 }
 
 export function isSassPartial (filePath) {
