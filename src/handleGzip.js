@@ -1,5 +1,9 @@
 import {promisify} from 'bluebird'
-const gzip = promisify(require('node-zopfli').gzip)
+import zlib from 'zlib'
+// compress stuff as much as possible, even if it is slower. since it is a one-time cost here
+zlib.Z_DEFAULT_COMPRESSION = zlib.Z_BEST_COMPRESSION
+const gzip = promisify(zlib.gzip)
+
 import {debug} from './utils'
 
 export default async function handleGzip (params) {

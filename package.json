@@ -43,7 +43,6 @@
     "js-yaml": "^3.5.5",
     "lodash": "^4.11.0",
     "node-sass": "3.4.2",
-    "node-zopfli": "^1.4.0",
     "postcss": "^5.0.19",
     "postcss-url": "^5.1.1",
     "rev-hash": "^1.0.0"
