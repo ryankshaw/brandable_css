@@ -1,5 +1,5 @@
 import {promisify} from 'bluebird'
-import {zlib} from 'zlib'
+import zlib from 'zlib'
 const gzip = promisify(zlib.gzip)
 
 import {debug} from './utils'
