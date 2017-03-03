@@ -1,6 +1,6 @@
-import fs from 'fs'
-import yaml from 'js-yaml'
+const fs = require('fs')
+const yaml = require('js-yaml')
 
-export default function loadConfig (pathToYamlFile) {
+module.exports = function loadConfig (pathToYamlFile) {
   return Object.freeze(yaml.safeLoad(fs.readFileSync(pathToYamlFile)))
 }

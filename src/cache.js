@@ -1,8 +1,8 @@
 const debug = require('debug')('brandable_css:cache')
-import _ from 'lodash'
-import CONFIG from './config'
-import SASS_STYLE from './sass_style'
-import {readJsonSync, outputJsonAsync} from 'fs-extra-promise'
+const _ = require('lodash')
+const CONFIG = require('./config')
+const SASS_STYLE = require('./sass_style')
+const {readJsonSync, outputJsonAsync} = require('fs-extra-promise')
 
 const caches = ['file_checksums', 'bundles_with_deps']
 
@@ -47,4 +47,4 @@ function initCache (name) {
 }
 caches.forEach(initCache)
 
-export default cache
+module.exports = cache

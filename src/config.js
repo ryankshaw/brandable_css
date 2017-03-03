@@ -1,3 +1,3 @@
-import loadConfig from './loadConfig'
+const loadConfig = require('./loadConfig')
 
-export default loadConfig('config/brandable_css.yml')
+module.exports = loadConfig('config/brandable_css.yml')

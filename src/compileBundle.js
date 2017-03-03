@@ -1,20 +1,20 @@
-import Promise from 'bluebird'
-const existsAsync = Promise.promisify(require('fs').stat)
-const sassRender = Promise.promisify(require('node-sass').render)
-import path from 'path'
-import chalk from 'chalk'
-import url from 'url'
-import postcss from 'postcss'
-import autoprefixer from 'autoprefixer'
-import postcssUrl from 'postcss-url'
-import CONFIG from './config'
+const Bluebird = require('bluebird')
+const existsAsync = Bluebird.promisify(require('fs').stat)
+const sassRender = Bluebird.promisify(require('node-sass').render)
+const path = require('path')
+const chalk = require('chalk')
+const url = require('url')
+const postcss = require('postcss')
+const autoprefixer = require('autoprefixer')
+const postcssUrl = require('postcss-url')
+const CONFIG = require('./config')
 const PATHS = CONFIG.paths
-import {BRANDABLE_VARIANTS} from './variants'
-import SASS_STYLE from './sass_style'
-import {fileChecksumSync} from './checksum'
-import supportedBrowsers from './supportedBrowsers'
-import cache from './cache'
-import {relativeSassPath, folderForBrandId} from './utils'
+const {BRANDABLE_VARIANTS} = require('./variants')
+const SASS_STYLE = require('./sass_style')
+const {fileChecksumSync} = require('./checksum')
+const supportedBrowsers = require('./supportedBrowsers')
+const cache = require('./cache')
+const {relativeSassPath, folderForBrandId} = require('./utils')
 
 function revedUrl (originalUrl, md5) {
   let parsedUrl = url.parse(originalUrl)
@@ -27,7 +27,7 @@ function warn () {
   console.error(chalk.yellow('brandable_css warning', ...arguments))
 }
 
-export default async function compileBundle ({bundleName, variant, brandId}) {
+module.exports = async function compileBundle ({bundleName, variant, brandId}) {
   const sassFile = path.join(PATHS.sass_dir, bundleName)
   let includePaths = [PATHS.sass_dir, path.join(PATHS.sass_dir, 'variants', variant)]
   // pull in 'config/brand_variables.scss' if we should

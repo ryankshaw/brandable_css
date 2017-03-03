@@ -1,10 +1,10 @@
-import {promisify} from 'bluebird'
-import zlib from 'zlib'
+const {promisify} = require('bluebird')
+const zlib = require('zlib')
 const gzip = promisify(zlib.gzip)
 
-import {debug} from './utils'
+const {debug} = require('./utils')
 
-export default async function handleGzip (params) {
+module.exports = async function handleGzip (params) {
   const css = params.Body
   if (css.length > 150) { // gzipping small files is not worth it
     const gzipped = await gzip(css, { level: zlib.Z_BEST_COMPRESSION })

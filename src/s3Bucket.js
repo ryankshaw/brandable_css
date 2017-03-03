@@ -1,10 +1,10 @@
-import AWS from 'aws-sdk'
-import { promisify } from 'bluebird'
-import { memoize } from 'lodash'
-import retry from 'bluebird-retry'
-import loadConfig from './loadConfig'
-import {debug} from './utils'
-import handleGzip from './handleGzip'
+const AWS = require('aws-sdk')
+const { promisify } = require('bluebird')
+const { memoize } = require('lodash')
+const retry = require('bluebird-retry')
+const loadConfig = require('./loadConfig')
+const {debug} = require('./utils')
+const handleGzip = require('./handleGzip')
 
 const customMethods = {
   uploadAsync: async function (params) {
@@ -50,4 +50,4 @@ if (CDN_CONFIG && CDN_CONFIG.bucket) {
   Object.assign(s3Bucket, customMethods)
 }
 
-export default s3Bucket
+module.exports = s3Bucket

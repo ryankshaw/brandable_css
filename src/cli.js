@@ -1,6 +1,6 @@
-import program from 'commander'
-import { checkAll, startWatcher } from './main'
-import { onError } from './utils'
+const program = require('commander')
+const { checkAll, startWatcher } = require('./main')
+const { onError } = require('./utils')
 
 program
   .version(require('../package').version)

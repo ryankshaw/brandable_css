@@ -1,8 +1,8 @@
-import _ from 'lodash'
-import yaml from 'js-yaml'
-import fs from 'fs'
-import CONFIG from './config'
+const _ = require('lodash')
+const yaml = require('js-yaml')
+const fs = require('fs')
+const CONFIG = require('./config')
 
-export default _.map(yaml.safeLoad(fs.readFileSync(CONFIG.paths.browsers_yml)).minimums, (version, browserName) => {
+module.exports = _.map(yaml.safeLoad(fs.readFileSync(CONFIG.paths.browsers_yml)).minimums, (version, browserName) => {
   return browserName.replace('Internet Explorer', 'Explorer') + ' >= ' + version
 })

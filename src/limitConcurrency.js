@@ -1,6 +1,6 @@
-import {debug} from './utils'
+const {debug} = require('./utils')
 
-export default function limitConcurrency (maxConcurrency, fn) {
+module.exports = function limitConcurrency (maxConcurrency, fn) {
   const queue = []
   let running = 0
   function startTask ({args, resolve, reject}) {

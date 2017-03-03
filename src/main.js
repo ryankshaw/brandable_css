@@ -1,20 +1,21 @@
-import {promisify} from 'bluebird'
-import fs from 'fs-extra-promise'
+const {promisify} = require('bluebird')
+const fs = require('fs-extra-promise')
 const glob = promisify(require('glob'))
-import path from 'path'
-import _ from 'lodash'
-import chalk from 'chalk'
-import chokidar from 'chokidar'
-import {checksum, relativeFileChecksum} from './checksum'
-import compileSingleBundle from './compileBundle'
-import {debug, relativeSassPath, isSassPartial, onError} from './utils'
-import CONFIG from './config'
+const path = require('path')
+const _ = require('lodash')
+const chalk = require('chalk')
+const chokidar = require('chokidar')
+const {checksum, relativeFileChecksum} = require('./checksum')
+const compileSingleBundle = require('./compileBundle')
+const {debug, relativeSassPath, isSassPartial, onError} = require('./utils')
+const CONFIG = require('./config')
 const PATHS = CONFIG.paths
-import VARIANTS, {BRANDABLE_VARIANTS} from './variants'
-import cache from './cache'
-import limitConcurrency from './limitConcurrency'
-import writeDefaultBrandableVariablesScss from './writeDefaultBrandableVariablesScss'
-import s3Bucket from './s3Bucket'
+const VARIANTS = require('./variants')
+const {BRANDABLE_VARIANTS} = VARIANTS
+const cache = require('./cache')
+const limitConcurrency = require('./limitConcurrency')
+const writeDefaultBrandableVariablesScss = require('./writeDefaultBrandableVariablesScss')
+const s3Bucket = require('./s3Bucket')
 
 function getBrandIds () {
   try {
@@ -32,7 +33,7 @@ function cacheFor (bundleName, variant) {
   return cache.bundles_with_deps.data[cacheKey(bundleName, variant)]
 }
 
-export function allFingerprintsFor (bundleName) {
+exports.allFingerprintsFor = function allFingerprintsFor (bundleName) {
   return VARIANTS.reduce((accumulator, variant) => {
     const cached = cacheFor(bundleName, variant)
     if (cached) accumulator[variant] = cached
@@ -118,7 +119,7 @@ async function findChangedBundles (bundles, onlyCheckThisBrandId) {
   return toCompile
 }
 
-export async function checkAll ({brandId}) {
+exports.checkAll = async function checkAll ({brandId}) {
   debug('checking all sass bundles to see if they need updating')
   await writeDefaultBrandableVariablesScss()
   const bundles = await glob(PATHS.all_sass_bundles).map(relativeSassPath)
@@ -134,7 +135,7 @@ export async function checkAll ({brandId}) {
 async function processChangedBundles (changedBundles) {
   debug('processing these bundles', changedBundles)
 
-  await Promise.all(_.map(changedBundles, async function(variants, bundleName) {
+  await Promise.all(_.map(changedBundles, async function (variants, bundleName) {
     let includesNoVariables
 
     async function compileUnlessIncludesNoVariables ({variant, brandId, unbrandedCombinedChecksum}) {
@@ -326,7 +327,7 @@ function unwatch (filename) {
   debug('unwatching', filename)
   watcher.unwatch(filename)
 }
-export function startWatcher () {
+exports.startWatcher = function startWatcher () {
   debug('watching for changes to any scss files')
   watcher = chokidar
     .watch(PATHS.brandable_variables_json, {persistent: true, cwd: PATHS.sass_dir})

@@ -1,20 +1,17 @@
-export const debug = require('debug')('brandable_css')
-import path from 'path'
-import CONFIG from './config'
+exports.debug = require('debug')('brandable_css')
+const path = require('path')
+const CONFIG = require('./config')
 
-export function folderForBrandId (brandId) {
-  return path.join(CONFIG.paths.branded_scss_folder, brandId)
-}
+exports.folderForBrandId = (brandId) =>
+  path.join(CONFIG.paths.branded_scss_folder, brandId)
 
-export function relativeSassPath (absPath) {
-  return path.relative(path.join(process.cwd(), CONFIG.paths.sass_dir), absPath)
-}
+exports.relativeSassPath = (absPath) =>
+  path.relative(path.join(process.cwd(), CONFIG.paths.sass_dir), absPath)
 
-export function isSassPartial (filePath) {
-  return path.basename(filePath)[0] === '_'
-}
+exports.isSassPartial = (filePath) =>
+  path.basename(filePath)[0] === '_'
 
-export function onError (err) {
+exports.onError = (err) => {
   console.error('error compiling sass', err, err.stack, err.message)
   process.exit(1)
 }
