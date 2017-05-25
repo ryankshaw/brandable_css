@@ -13,5 +13,5 @@ module.exports = async function writeDefaultBrandableVariablesScss () {
       fileContents += `\n$${variable.variable_name}: ${value} !default;`
     })
   })
-  return await writeFileAsync(CONFIG.paths.brandable_variables_defaults_scss, fileContents)
+  return writeFileAsync(CONFIG.paths.brandable_variables_defaults_scss, fileContents)
 }

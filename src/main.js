@@ -129,7 +129,7 @@ exports.checkAll = async function checkAll ({brandId}) {
     return
   }
   debug('these bundles have changed', changedBundles)
-  return await processChangedBundles(changedBundles)
+  return processChangedBundles(changedBundles)
 }
 
 async function processChangedBundles (changedBundles) {

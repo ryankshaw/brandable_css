@@ -5,10 +5,10 @@ const CONFIG = require('./config')
 
 function checksum (data) {
   if (typeof data === 'string') {
-    data = new Buffer(data)
+    data = Buffer.from(data)
   }
   // we use revHash here because that is the same thing 'gulp-rev' uses
-  return revHash(data)
+  return revHash()
 }
 
 function relativeFileChecksum (relativePath) {
