@@ -8,7 +8,7 @@ function checksum (data) {
     data = Buffer.from(data)
   }
   // we use revHash here because that is the same thing 'gulp-rev' uses
-  return revHash()
+  return revHash(data)
 }
 
 function relativeFileChecksum (relativePath) {

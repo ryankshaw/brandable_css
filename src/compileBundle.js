@@ -39,7 +39,8 @@ module.exports = async function compileBundle ({bundleName, variant, brandId}) {
   }
 
   let urlsFoundInCss = new Set()
-  function putMD5sInUrls (originalUrl) {
+  function putMD5sInUrls(originalParsedUrl) {
+    const originalUrl = originalParsedUrl.url
     const parsedUrl = url.parse(originalUrl)
     if (!parsedUrl.pathname || parsedUrl.protocol === 'data:') {
       return originalUrl
