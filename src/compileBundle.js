@@ -1,5 +1,4 @@
 const Bluebird = require('bluebird')
-const existsAsync = Bluebird.promisify(require('fs').stat)
 const sassRender = Bluebird.promisify(require('node-sass').render)
 const path = require('path')
 const chalk = require('chalk')
@@ -9,12 +8,11 @@ const autoprefixer = require('autoprefixer')
 const postcssUrl = require('postcss-url')
 const CONFIG = require('./config')
 const PATHS = CONFIG.paths
-const {BRANDABLE_VARIANTS} = require('./variants')
 const SASS_STYLE = require('./sass_style')
 const {fileChecksumSync} = require('./checksum')
 const supportedBrowsers = require('./supportedBrowsers')
 const cache = require('./cache')
-const {relativeSassPath, folderForBrandId} = require('./utils')
+const {relativeSassPath} = require('./utils')
 
 function revedUrl (originalUrl, md5) {
   let parsedUrl = url.parse(originalUrl)
@@ -27,16 +25,9 @@ function warn () {
   console.error(chalk.yellow('brandable_css warning', ...arguments))
 }
 
-module.exports = async function compileBundle ({bundleName, variant, brandId}) {
+module.exports = async function compileBundle ({bundleName, variant}) {
   const sassFile = path.join(PATHS.sass_dir, bundleName)
   let includePaths = [PATHS.sass_dir, path.join(PATHS.sass_dir, 'variants', variant)]
-  // pull in 'config/brand_variables.scss' if we should
-  if (brandId) {
-    if (!BRANDABLE_VARIANTS.has(variant)) throw new Error(`${variant} is not brandable`)
-    const fileExists = await existsAsync(path.join(folderForBrandId(brandId), '_brand_variables.scss'))
-    if (!fileExists) throw new Error(`_brand_variables.scss file not found for ${brandId}`)
-    includePaths.unshift(folderForBrandId(brandId))
-  }
 
   let urlsFoundInCss = new Set()
   function putMD5sInUrls (originalParsedUrl) {
@@ -79,7 +70,7 @@ module.exports = async function compileBundle ({bundleName, variant, brandId}) {
   ]).process(nodeSassResult.css, {from: sassFile})
 
   postcssResult.warnings().forEach(warn)
-  console.warn(chalk.green('compiled', bundleName, variant, brandId || '', 'in'), new Date() - startTime, 'ms')
+  console.warn(chalk.green('compiled', bundleName, variant, 'in'), new Date() - startTime, 'ms')
 
   return {
     css: postcssResult.css,
