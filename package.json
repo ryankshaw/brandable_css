@@ -1,30 +1,25 @@
 {
-  "name": "brandable_css",
-  "version": "0.1.0",
+  "name": "@instructure/brandable_css",
+  "version": "1.0.0",
   "description": "This is what we use to compile sass in canvas-lms with all our variants and custom theme editor css",
+  "main": "./src/main.js",
   "scripts": {
-    "build": "./node_modules/.bin/standard --verbose && ./node_modules/.bin/babel src --out-dir lib",
-    "dev": "npm run build -- --watch",
-    "prepublish": "npm run build",
-    "release": "npm version patch && git push && npm publish",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha"
   },
-  "repository": "ryankshaw/brandable_css",
-  "author": "Ryan Shaw <ryankshaw@gmail.com>",
+  "repository": "instructure/brandable_css",
+  "author": [
+    "Ryan Shaw <ryankshaw@gmail.com>",
+    "Ahmad Amireh <ahmad@instructure.com>"
+  ],
   "license": "MIT",
-  "homepage": "https://github.com/ryankshaw/brandable_css",
+  "homepage": "https://github.com/instructure/brandable_css",
   "bin": "./bin/brandable_css",
   "files": [
     "bin",
-    "lib",
     "src"
   ],
-  "standard": {
-    "parser": "babel-eslint"
-  },
   "dependencies": {
     "autoprefixer": "^7.0.0",
-    "bluebird": "^3.4.7",
     "chalk": "^2.1.0",
     "chokidar": "^1.6.1",
     "commander": "^2.9.0",
@@ -39,9 +34,7 @@
     "rev-hash": "^2.0.0"
   },
   "devDependencies": {
-    "babel-cli": "^6.23.0",
-    "babel-eslint": "^8.0.1",
-    "babel-preset-env": "^1.1.11",
-    "standard": "^10.0.2"
+    "chai": "^4.3.4",
+    "mocha": "^9.0.2"
   }
 }

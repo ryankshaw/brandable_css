@@ -1,4 +1,4 @@
-const {promisify} = require('bluebird')
+const {promisify} = require('util')
 const fs = require('fs-extra-promise')
 const glob = promisify(require('glob'))
 const path = require('path')
@@ -90,12 +90,8 @@ async function findChangedBundles (bundles) {
 
 exports.checkAll = async function checkAll () {
   debug('checking all sass bundles to see if they need updating')
-  const bundles = await glob(PATHS.all_sass_bundles).map(relativeSassPath)
-  const changedBundles = await findChangedBundles(bundles)
-  if (_.isEmpty(changedBundles)) {
-    console.info(chalk.green('no sass changes detected'))
-    return
-  }
+  const bundles = await glob(PATHS.all_sass_bundles)
+  const changedBundles = await findChangedBundles(bundles.map(relativeSassPath))
   debug('these bundles have changed', changedBundles)
   return processChangedBundles(changedBundles)
 }
@@ -124,7 +120,12 @@ async function processChangedBundles (changedBundles) {
       if (compileSelf) await compileUnlessIncludesNoVariables({variant})
     }))
   }))
-  cache.saveAll()
+
+  if (_.isEmpty(changedBundles)) {
+    console.info(chalk.green('no sass changes detected'))
+  }
+
+  return cache.saveAll()
 }
 
 function getChecksum (relativePath) {

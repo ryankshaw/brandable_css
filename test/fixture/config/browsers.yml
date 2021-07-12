@@ -1,0 +1,5 @@
+---
+minimums:
+  chrome: 83
+  safari: 12
+  firefox: 78

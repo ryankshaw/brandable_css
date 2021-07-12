@@ -1,5 +1,5 @@
-const Bluebird = require('bluebird')
-const sassRender = Bluebird.promisify(require('node-sass').render)
+const {promisify} = require('util')
+const sassRender = promisify(require('node-sass').render)
 const path = require('path')
 const chalk = require('chalk')
 const url = require('url')

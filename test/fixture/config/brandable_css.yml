@@ -1,0 +1,20 @@
+paths:
+  public_dir: public
+  sass_dir: test/fixture/app/stylesheets
+  all_sass_bundles: 'test/fixture/app/stylesheets/**/[^_]*.s[ac]ss'
+  bundles_with_deps: tmp/dist/bundles_with_deps.json
+  file_checksums: tmp/dist/file_checksums.json
+  output_dir: tmp/dist
+  browsers_yml: test/fixture/config/browsers.yml
+
+indices:
+  handlebars:
+    path: tmp/dist/handlebars_index.json
+    bundles: 'jst/**'
+    keysz: 2
+
+manifest_key_seperator: $$$$$$$$$$$
+
+variants:
+  normal_contrast: {}
+  high_contrast: {}
